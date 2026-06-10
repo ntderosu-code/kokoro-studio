@@ -212,6 +212,16 @@ struct SidebarView: View {
             }
 
             Section("Pronunciation") {
+                Picker("Numbers", selection: Binding(
+                    get: { state.numberPreset },
+                    set: { state.numberPreset = $0 })) {
+                    ForEach(NumberPreset.allCases) { preset in
+                        Text(preset.label).tag(preset)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .help("Natural expands symbols for reading: $5.50, 25%, 1–2, v1.2, x², °C. Literal reads text as written.")
+
                 Button("Edit Dictionary…") {
                     showingDictionaryEditor = true
                 }

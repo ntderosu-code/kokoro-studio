@@ -16,6 +16,8 @@ struct Profile: Codable, Equatable {
     var normalizeLoudness: Bool
     var exportFormat: String
     var speakerVoicesJSON: String
+    // Added after v1.1 — optional so older profile files still decode.
+    var numberPreset: String? = nil
 }
 
 enum ProfileStore {

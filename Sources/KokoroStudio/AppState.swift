@@ -56,6 +56,12 @@ final class AppState: ObservableObject {
     @AppStorage("headingPauseMs") var headingPauseMs = 800
     @AppStorage("pronunciationRules") var pronunciationRulesText = ""
     @AppStorage("speakerVoices") var speakerVoicesJSON = ""
+    @AppStorage("numberPreset") private var numberPresetRaw = NumberPreset.natural.rawValue
+
+    var numberPreset: NumberPreset {
+        get { NumberPreset(rawValue: numberPresetRaw) ?? .natural }
+        set { numberPresetRaw = newValue.rawValue }
+    }
 
     var pauseSettings: PauseSettings {
         PauseSettings(paragraphMs: paragraphPauseMs, sentenceMs: sentencePauseMs,
@@ -184,7 +190,10 @@ final class AppState: ObservableObject {
 
         let kind = engineKind
         let rules = PronunciationDictionary.parse(pronunciationRulesText)
-        let processedScript = PronunciationDictionary.apply(rules, to: script)
+        // User dictionary first (their rules win), then number normalization.
+        var processedScript = PronunciationDictionary.apply(rules, to: script)
+        processedScript = NumberNormalizer.normalize(processedScript,
+                                                     preset: numberPreset)
         let segments = ScriptSegmenter.segment(processedScript,
                                                pauses: pauseSettings,
                                                sentenceSplit: captionFormat != .off)
@@ -373,7 +382,8 @@ final class AppState: ObservableObject {
                 captionFormat: captionFormat.rawValue,
                 normalizeLoudness: normalizeLoudness,
                 exportFormat: exportFormat.rawValue,
-                speakerVoicesJSON: speakerVoicesJSON)
+                speakerVoicesJSON: speakerVoicesJSON,
+                numberPreset: numberPreset.rawValue)
     }
 
     func apply(_ profile: Profile) {
@@ -390,6 +400,8 @@ final class AppState: ObservableObject {
         normalizeLoudness = profile.normalizeLoudness
         exportFormat = ExportFormat(rawValue: profile.exportFormat) ?? .wav
         speakerVoicesJSON = profile.speakerVoicesJSON
+        numberPreset = profile.numberPreset
+            .flatMap { NumberPreset(rawValue: $0) } ?? .natural
     }
 
     func chooseOutputFolder() {
