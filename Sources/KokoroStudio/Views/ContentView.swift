@@ -24,43 +24,14 @@ struct ContentView: View {
         return selection.isEmpty ? nil : selection
     }
 
-    /// The editor's backing NSTextView, focused — for find bar and Writing
-    /// Tools, which both operate on the first responder.
-    @discardableResult
-    private func focusedEditorTextView() -> NSTextView? {
-        if let textView = NSApp.keyWindow?.firstResponder as? NSTextView {
-            return textView
-        }
-        guard let contentView = NSApp.keyWindow?.contentView,
-              let textView = findTextView(in: contentView) else { return nil }
-        NSApp.keyWindow?.makeFirstResponder(textView)
-        return textView
-    }
-
-    private func findTextView(in view: NSView) -> NSTextView? {
-        if let textView = view as? NSTextView, textView.isEditable {
-            return textView
-        }
-        for subview in view.subviews {
-            if let found = findTextView(in: subview) { return found }
-        }
-        return nil
-    }
-
     private func showFindAndReplace() {
-        guard let textView = focusedEditorTextView() else { return }
+        guard let textView = EditorTextAccess.focusTextView(in: NSApp.keyWindow)
+        else { return }
         textView.usesFindBar = true
         textView.isIncrementalSearchingEnabled = true
         let action = NSMenuItem()
         action.tag = NSTextFinder.Action.showReplaceInterface.rawValue
         textView.performTextFinderAction(action)
-    }
-
-    private func showWritingTools() {
-        guard let textView = focusedEditorTextView() else { return }
-        // Travels the responder chain; presents the system Writing Tools
-        // popover on the current selection (Apple Intelligence required).
-        NSApp.sendAction(Selector(("showWritingTools:")), to: textView, from: nil)
     }
 
     var body: some View {
@@ -141,10 +112,8 @@ struct ContentView: View {
                 .help("Find and replace in the script (⌘F)")
 
                 if #available(macOS 15.2, *) {
-                    Button("Writing Tools", systemImage: "wand.and.sparkles") {
-                        showWritingTools()
-                    }
-                    .help("Proofread or rewrite the selection with Apple Intelligence")
+                    WritingToolsToolbarButton()
+                        .help("Proofread or rewrite the selection with Apple Intelligence")
                 }
 
                 Button("Export", systemImage: "square.and.arrow.up") {
@@ -206,7 +175,7 @@ struct ContentView: View {
         let estimate = DurationEstimator.estimate(
             script: state.script, pauses: state.pauseSettings,
             wordsPerSecond: state.calibratedWordsPerSecond, speed: state.speed)
-        return "\(words) words · \(DurationEstimator.formatted(estimate))"
+        return "\(words) words · est. \(DurationEstimator.formatted(estimate))"
     }
 
     private var actionBar: some View {

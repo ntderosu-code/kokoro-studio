@@ -50,8 +50,8 @@ final class DurationEstimatorTests: XCTestCase {
     }
 
     func testFormatting() {
-        XCTAssertEqual(DurationEstimator.formatted(45), "~0:45")
-        XCTAssertEqual(DurationEstimator.formatted(200), "~3:20")
-        XCTAssertEqual(DurationEstimator.formatted(3730), "~1:02:10")
+        XCTAssertEqual(DurationEstimator.formatted(45), "0:45")
+        XCTAssertEqual(DurationEstimator.formatted(200), "3:20")
+        XCTAssertEqual(DurationEstimator.formatted(3730), "1:02:10")
     }
 }

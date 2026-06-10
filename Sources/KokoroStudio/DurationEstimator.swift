@@ -34,13 +34,13 @@ enum DurationEstimator {
         return previousRate * 0.5 + measured * 0.5
     }
 
-    /// "~0:45", "~3:20", "~1:02:10"
+    /// "0:45", "3:20", "1:02:10"
     static func formatted(_ seconds: TimeInterval) -> String {
         let total = Int(seconds.rounded())
         if total >= 3600 {
-            return String(format: "~%d:%02d:%02d", total / 3600,
+            return String(format: "%d:%02d:%02d", total / 3600,
                           total / 60 % 60, total % 60)
         }
-        return String(format: "~%d:%02d", total / 60, total % 60)
+        return String(format: "%d:%02d", total / 60, total % 60)
     }
 }
