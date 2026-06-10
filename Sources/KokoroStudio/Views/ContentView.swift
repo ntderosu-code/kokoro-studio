@@ -4,6 +4,21 @@ struct ContentView: View {
     @EnvironmentObject private var state: AppState
     @StateObject private var player = PlayerController()
     @State private var sidebarVisible = true
+    @State private var quickAddWord: String?
+
+    /// Reads the current selection from the focused text view (the script
+    /// editor). SwiftUI's TextEditor exposes no selection binding on macOS,
+    /// so we go through the responder chain.
+    private func selectedEditorText() -> String? {
+        guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView else {
+            return nil
+        }
+        let range = textView.selectedRange()
+        guard range.length > 0 else { return nil }
+        let selection = (textView.string as NSString).substring(with: range)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return selection.isEmpty ? nil : selection
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,11 +40,28 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup {
+                Button("Add to Dictionary", systemImage: "character.book.closed") {
+                    if let selection = selectedEditorText() {
+                        quickAddWord = selection
+                    } else {
+                        state.errorMessage =
+                            "Select a word or phrase in the editor first, then press ⌘D."
+                    }
+                }
+                .keyboardShortcut("d", modifiers: .command)
+                .help("Add selected word to pronunciation dictionary (⌘D)")
+
                 Button("Settings", systemImage: "sidebar.right") {
                     withAnimation { sidebarVisible.toggle() }
                 }
                 .help("Toggle settings sidebar")
             }
+        }
+        .sheet(item: Binding(
+            get: { quickAddWord.map(QuickAddTarget.init) },
+            set: { quickAddWord = $0?.word })) { target in
+            QuickAddDictionaryView(word: target.word,
+                                   rulesText: $state.pronunciationRulesText)
         }
         .onChange(of: state.lastAudio?.previewWAV) { _, url in
             if let url { player.load(url: url) }

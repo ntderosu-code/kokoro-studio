@@ -13,15 +13,25 @@ enum AudioProcessing {
         return result
     }
 
+    /// Number of samples `trimSilence` would remove from the front — callers
+    /// use this to shift caption cue timings after trimming.
+    static func leadingTrimCount(_ samples: [Float], sampleRate: Int) -> Int {
+        let threshold: Float = 0.001
+        guard let first = samples.firstIndex(where: { abs($0) > threshold }) else {
+            return 0
+        }
+        let pad = sampleRate * 60 / 1000
+        return max(0, first - pad)
+    }
+
     /// Removes leading/trailing audio below -60 dBFS, keeping a 60ms pad.
     static func trimSilence(_ samples: [Float], sampleRate: Int) -> [Float] {
         let threshold: Float = 0.001
-        guard let first = samples.firstIndex(where: { abs($0) > threshold }),
-              let last = samples.lastIndex(where: { abs($0) > threshold }) else {
+        guard let last = samples.lastIndex(where: { abs($0) > threshold }) else {
             return samples // all silence; leave untouched
         }
         let pad = sampleRate * 60 / 1000
-        let start = max(0, first - pad)
+        let start = leadingTrimCount(samples, sampleRate: sampleRate)
         let end = min(samples.count, last + pad + 1)
         return Array(samples[start..<end])
     }

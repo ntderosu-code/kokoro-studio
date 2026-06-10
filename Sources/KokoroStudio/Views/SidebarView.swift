@@ -110,6 +110,15 @@ struct SidebarView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
 
+                Picker("Captions", selection: Binding(
+                    get: { state.captionFormat },
+                    set: { state.captionFormat = $0 })) {
+                    ForEach(CaptionFormat.allCases) { format in
+                        Text(format.label).tag(format)
+                    }
+                }
+                .help("Export a synced caption file next to the audio — cues follow sentences and pauses")
+
                 Toggle("Normalize loudness", isOn: $state.normalizeLoudness)
                     .help("Trim silence, level volume to -1 dBFS, and add micro fades — keeps every clip at the same loudness")
 
@@ -259,12 +268,16 @@ struct DictionaryEditorView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Pronunciation Dictionary")
                     .font(.headline)
-                Text("One rule per line: word = how it should sound. " +
-                     "Applied to whole words, ignoring case, before synthesis. " +
-                     "Lines starting with # are comments.")
+                Text("One rule per line. Applied to whole words, ignoring case, " +
+                     "before synthesis. Lines starting with # are comments.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("Example:  kokoro = koh koh roh")
+                Text("""
+                kokoro = koh koh roh      (respell)
+                APA = @letters            (spell out: A-P-A)
+                NASA = @word              (say as written)
+                IEP = @letters-first      (spell out first use only)
+                """)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
             }

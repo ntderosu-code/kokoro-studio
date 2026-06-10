@@ -38,6 +38,7 @@ final class AppState: ObservableObject {
         let samples: [Float]
         let sampleRate: Int
         let previewWAV: URL
+        let cues: [CaptionCue]
     }
 
     @Published var script = ""
@@ -55,6 +56,12 @@ final class AppState: ObservableObject {
     @AppStorage("engineKind") private var engineKindRaw = TTSEngineKind.kokoro.rawValue
     @AppStorage("pocketVoicePath") var pocketVoicePath = ""
     @AppStorage("normalizeLoudness") var normalizeLoudness = true
+    @AppStorage("captionFormat") private var captionFormatRaw = CaptionFormat.off.rawValue
+
+    var captionFormat: CaptionFormat {
+        get { CaptionFormat(rawValue: captionFormatRaw) ?? .off }
+        set { captionFormatRaw = newValue.rawValue }
+    }
 
     var engineKind: TTSEngineKind {
         get { TTSEngineKind(rawValue: engineKindRaw) ?? .kokoro }
@@ -157,7 +164,8 @@ final class AppState: ObservableObject {
         let processedScript = PronunciationDictionary.apply(rules, to: script)
         let segments = ScriptSegmenter.segment(processedScript,
                                                paragraphPauseMs: paragraphPauseMs,
-                                               punctuationPauseMs: punctuationPauseMs)
+                                               punctuationPauseMs: punctuationPauseMs,
+                                               sentenceSplit: captionFormat != .off)
         let voice = voiceID
         let speedValue = Float(speed)
         let voiceReferenceURL = pocketVoiceURL
@@ -204,6 +212,7 @@ final class AppState: ObservableObject {
                 }
 
                 var allSamples: [Float] = []
+                var segmentResults: [(text: String, sampleCount: Int, pauseAfterMs: Int)] = []
                 let segmentCount = max(segments.count, 1)
                 for (index, segment) in segments.enumerated() {
                     if flag.isCancelled { break }
@@ -217,15 +226,19 @@ final class AppState: ObservableObject {
                         return !flag.isCancelled
                     }
                     allSamples.append(contentsOf: segmentSamples)
+                    segmentResults.append((segment.text, segmentSamples.count,
+                                           segment.pauseAfterMs))
                     if segment.pauseAfterMs > 0, !flag.isCancelled {
                         let silenceFrames = sampleRate * segment.pauseAfterMs / 1000
                         allSamples.append(contentsOf: [Float](repeating: 0, count: silenceFrames))
                     }
                 }
                 let samples = allSamples
+                let results = segmentResults
                 await MainActor.run {
                     self.finishGeneration(samples: samples, sampleRate: sampleRate,
-                                          cancelled: flag.isCancelled)
+                                          cancelled: flag.isCancelled,
+                                          segmentResults: results)
                 }
             } catch {
                 await MainActor.run {
@@ -238,13 +251,28 @@ final class AppState: ObservableObject {
     }
 
     private func finishGeneration(samples rawSamples: [Float], sampleRate: Int,
-                                  cancelled: Bool) {
+                                  cancelled: Bool,
+                                  segmentResults: [(text: String, sampleCount: Int, pauseAfterMs: Int)]) {
         phase = .ready
         currentCancellation = nil
         guard !cancelled, !rawSamples.isEmpty else { return }
-        let samples = normalizeLoudness
-            ? AudioProcessing.finalize(samples: rawSamples, sampleRate: sampleRate)
-            : rawSamples
+
+        let samples: [Float]
+        var cues = CaptionWriter.buildCues(segments: segmentResults,
+                                           sampleRate: sampleRate)
+        if normalizeLoudness {
+            // Trimming leading silence shifts everything earlier; keep the
+            // cues in sync with what listeners actually hear.
+            let trimOffset = Double(AudioProcessing.leadingTrimCount(
+                rawSamples, sampleRate: sampleRate)) / Double(sampleRate)
+            samples = AudioProcessing.finalize(samples: rawSamples,
+                                               sampleRate: sampleRate)
+            cues = CaptionWriter.adjust(cues, offset: trimOffset,
+                                        totalDuration: Double(samples.count) / Double(sampleRate))
+        } else {
+            samples = rawSamples
+        }
+
         do {
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("kokoro-preview-\(UUID().uuidString)")
@@ -252,7 +280,7 @@ final class AppState: ObservableObject {
             try AudioExporter.write(samples: samples, sampleRate: sampleRate,
                                     to: url, format: .wav)
             lastAudio = GeneratedAudio(samples: samples, sampleRate: sampleRate,
-                                       previewWAV: url)
+                                       previewWAV: url, cues: cues)
         } catch {
             errorMessage = "Could not prepare preview audio: \(error.localizedDescription)"
         }
@@ -283,6 +311,15 @@ final class AppState: ObservableObject {
             try AudioExporter.write(samples: audio.samples,
                                     sampleRate: audio.sampleRate,
                                     to: destination, format: exportFormat)
+            if captionFormat != .off, !audio.cues.isEmpty {
+                let captionText = captionFormat == .vtt
+                    ? CaptionWriter.vtt(audio.cues)
+                    : CaptionWriter.srt(audio.cues)
+                let captionURL = destination.deletingPathExtension()
+                    .appendingPathExtension(captionFormat.fileExtension)
+                try captionText.write(to: captionURL, atomically: true,
+                                      encoding: .utf8)
+            }
             NSWorkspace.shared.activateFileViewerSelecting([destination])
         } catch {
             errorMessage = "Export failed: \(error.localizedDescription)"

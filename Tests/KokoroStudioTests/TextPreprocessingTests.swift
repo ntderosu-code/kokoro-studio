@@ -11,20 +11,58 @@ final class PronunciationDictionaryTests: XCTestCase {
         not a rule line
         """)
         XCTAssertEqual(rules, [
-            PronunciationRule(word: "kokoro", replacement: "koh koh roh"),
-            PronunciationRule(word: "SQL", replacement: "sequel"),
+            PronunciationRule(word: "kokoro", kind: .replace("koh koh roh")),
+            PronunciationRule(word: "SQL", kind: .replace("sequel")),
+        ])
+    }
+
+    func testParseModes() {
+        let rules = PronunciationDictionary.parse("""
+        APA = @letters
+        NASA = @word
+        IEP = @letters-first
+        """)
+        XCTAssertEqual(rules, [
+            PronunciationRule(word: "APA", kind: .letters),
+            PronunciationRule(word: "NASA", kind: .word),
+            PronunciationRule(word: "IEP", kind: .lettersFirst),
         ])
     }
 
     func testApplyIsCaseInsensitiveWholeWord() {
-        let rules = [PronunciationRule(word: "SQL", replacement: "sequel")]
+        let rules = [PronunciationRule(word: "SQL", kind: .replace("sequel"))]
         let output = PronunciationDictionary.apply(
             rules, to: "Sql and SQL but not SQLite.")
         XCTAssertEqual(output, "sequel and sequel but not SQLite.")
     }
 
+    func testSpelledOut() {
+        XCTAssertEqual(PronunciationDictionary.spelledOut("APA"), "A. P. A.")
+        XCTAssertEqual(PronunciationDictionary.spelledOut("MP3"), "M. P. 3")
+    }
+
+    func testLettersMode() {
+        let rules = [PronunciationRule(word: "APA", kind: .letters)]
+        XCTAssertEqual(PronunciationDictionary.apply(rules, to: "Use APA style."),
+                       "Use A. P. A. style.")
+    }
+
+    func testWordModeIsNoop() {
+        let rules = [PronunciationRule(word: "NASA", kind: .word)]
+        XCTAssertEqual(PronunciationDictionary.apply(rules, to: "NASA launched."),
+                       "NASA launched.")
+    }
+
+    func testLettersFirstOnlyFirstOccurrence() {
+        let rules = [PronunciationRule(word: "IEP", kind: .lettersFirst)]
+        let output = PronunciationDictionary.apply(
+            rules, to: "An IEP is a plan. The IEP is reviewed yearly.")
+        XCTAssertEqual(output,
+                       "An I. E. P. is a plan. The IEP is reviewed yearly.")
+    }
+
     func testApplyHandlesRegexSpecialCharacters() {
-        let rules = [PronunciationRule(word: "C++", replacement: "see plus plus")]
+        let rules = [PronunciationRule(word: "C++", kind: .replace("see plus plus"))]
         // "C++" has no trailing word boundary after '+'; rule should not crash
         // and should leave unrelated text alone.
         _ = PronunciationDictionary.apply(rules, to: "I write C++ daily.")
