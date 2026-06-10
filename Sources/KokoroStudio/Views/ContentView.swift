@@ -31,13 +31,18 @@ struct ContentView: View {
                    minHeight: 200, maxHeight: .infinity)
             .safeAreaInset(edge: .bottom, spacing: 0) {
             BarGlassContainer(spacing: 10) {
-                if state.lastAudio != nil {
-                    PlayerBar(player: player)
+                VStack(spacing: 10) {
+                    if state.lastAudio != nil {
+                        PlayerBar(player: player,
+                                  onExport: { showingExportSheet = true })
+                            .barGlass()
+                    }
+                    actionBar
                         .barGlass()
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
-                        .padding(.top, 4)
                 }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+                .padding(.top, 4)
             }
             .animation(.spring(duration: 0.35),
                        value: state.lastAudio?.previewWAV)
@@ -82,27 +87,6 @@ struct ContentView: View {
             }
 
             ToolbarItemGroup {
-                statusView
-
-                if state.isGenerating {
-                    Button("Stop", systemImage: "stop.fill") {
-                        state.cancelGeneration()
-                    }
-                    .help("Stop generation")
-                } else {
-                    Button {
-                        player.stop()
-                        state.generate()
-                    } label: {
-                        Label(state.lastAudio == nil ? "Generate" : "Re-generate",
-                              systemImage: "waveform")
-                    }
-                    .prominentActionButtonStyle()
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(!state.canGenerate)
-                    .help("Generate speech (⌘↩)")
-                }
-
                 Button("Export", systemImage: "square.and.arrow.up") {
                     showingExportSheet = true
                 }
@@ -159,6 +143,33 @@ struct ContentView: View {
         } message: {
             Text(state.errorMessage ?? "")
         }
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: 12) {
+            statusView
+            Spacer()
+            if state.isGenerating {
+                Button("Stop") {
+                    state.cancelGeneration()
+                }
+                .secondaryActionButtonStyle()
+                .controlSize(.large)
+                .help("Stop generation")
+            } else {
+                Button(state.lastAudio == nil ? "Generate" : "Re-generate") {
+                    player.stop()
+                    state.generate()
+                }
+                .prominentActionButtonStyle()
+                .controlSize(.large)
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(!state.canGenerate)
+                .help("Generate speech (⌘↩)")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder

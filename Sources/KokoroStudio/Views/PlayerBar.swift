@@ -3,6 +3,7 @@ import SwiftUI
 struct PlayerBar: View {
     @EnvironmentObject private var state: AppState
     @ObservedObject var player: PlayerController
+    var onExport: () -> Void = {}
 
     private func timeString(_ seconds: Double) -> String {
         let total = Int(seconds.rounded())
@@ -35,6 +36,12 @@ struct PlayerBar: View {
             Text(timeString(player.duration))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
+
+            Button("Export", systemImage: "square.and.arrow.up") {
+                onExport()
+            }
+            .secondaryActionButtonStyle()
+            .help("Export audio and captions (⌘S)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
