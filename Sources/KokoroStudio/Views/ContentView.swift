@@ -24,6 +24,45 @@ struct ContentView: View {
         return selection.isEmpty ? nil : selection
     }
 
+    /// The editor's backing NSTextView, focused — for find bar and Writing
+    /// Tools, which both operate on the first responder.
+    @discardableResult
+    private func focusedEditorTextView() -> NSTextView? {
+        if let textView = NSApp.keyWindow?.firstResponder as? NSTextView {
+            return textView
+        }
+        guard let contentView = NSApp.keyWindow?.contentView,
+              let textView = findTextView(in: contentView) else { return nil }
+        NSApp.keyWindow?.makeFirstResponder(textView)
+        return textView
+    }
+
+    private func findTextView(in view: NSView) -> NSTextView? {
+        if let textView = view as? NSTextView, textView.isEditable {
+            return textView
+        }
+        for subview in view.subviews {
+            if let found = findTextView(in: subview) { return found }
+        }
+        return nil
+    }
+
+    private func showFindAndReplace() {
+        guard let textView = focusedEditorTextView() else { return }
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
+        let action = NSMenuItem()
+        action.tag = NSTextFinder.Action.showReplaceInterface.rawValue
+        textView.performTextFinderAction(action)
+    }
+
+    private func showWritingTools() {
+        guard let textView = focusedEditorTextView() else { return }
+        // Travels the responder chain; presents the system Writing Tools
+        // popover on the current selection (Apple Intelligence required).
+        NSApp.sendAction(Selector(("showWritingTools:")), to: textView, from: nil)
+    }
+
     var body: some View {
         // Standard macOS architecture: NavigationSplitView's sidebar gets the
         // system Liquid Glass floating-slab treatment on macOS 26 for free.
@@ -96,6 +135,18 @@ struct ContentView: View {
             }
 
             ToolbarItemGroup {
+                Button("Find & Replace", systemImage: "magnifyingglass") {
+                    showFindAndReplace()
+                }
+                .help("Find and replace in the script (⌘F)")
+
+                if #available(macOS 15.2, *) {
+                    Button("Writing Tools", systemImage: "wand.and.sparkles") {
+                        showWritingTools()
+                    }
+                    .help("Proofread or rewrite the selection with Apple Intelligence")
+                }
+
                 Button("Export", systemImage: "square.and.arrow.up") {
                     showingExportSheet = true
                 }
@@ -221,6 +272,7 @@ struct EditorView: View {
             .font(.system(size: 14))
             .lineSpacing(4)
             .scrollContentBackground(.hidden)
+            .editorWritingTools()
             // Overlay on the TextEditor itself so the placeholder shares its
             // coordinate space: 5pt = NSTextView's line fragment padding,
             // which is exactly where the caret sits.

@@ -5,6 +5,17 @@ import SwiftUI
 // bar) per HIG — content surfaces and the settings form stay standard.
 
 extension View {
+    /// Opts the editor into full inline Apple Intelligence Writing Tools
+    /// where available; no-op on older systems.
+    @ViewBuilder
+    func editorWritingTools() -> some View {
+        if #available(macOS 15.4, *) {
+            self.writingToolsBehavior(.complete)
+        } else {
+            self
+        }
+    }
+
     /// Floating-bar chrome: Liquid Glass on macOS 26+, material card below.
     @ViewBuilder
     func barGlass(cornerRadius: CGFloat = 14) -> some View {

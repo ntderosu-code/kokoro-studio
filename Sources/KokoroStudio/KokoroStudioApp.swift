@@ -13,6 +13,9 @@ struct KokoroStudioApp: App {
         }
         .defaultSize(width: 940, height: 620)
         .commands {
+            // System Find / Find & Replace menu items (⌘F, ⌥⌘F) wired to the
+            // focused text view's native find bar.
+            TextEditingCommands()
             // Replace the default (empty) help viewer with something useful.
             CommandGroup(replacing: .help) {
                 Link("Kokoro Studio Help",
