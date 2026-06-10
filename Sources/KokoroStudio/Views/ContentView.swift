@@ -26,7 +26,9 @@ struct ContentView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        // The panel floats OVER the page so the page and script show through
+        // the glass — content beside glass has nothing to refract.
+        ZStack(alignment: .trailing) {
             editorPane
             if sidebarVisible {
                 SidebarView()
@@ -43,7 +45,7 @@ struct ContentView: View {
     }
 
     private var editorPane: some View {
-        EditorView()
+        EditorView(trailingInset: sidebarVisible ? 312 : 0)
             .padding(14)
             .frame(minWidth: 380, maxWidth: .infinity,
                    minHeight: 200, maxHeight: .infinity)
@@ -60,7 +62,8 @@ struct ContentView: View {
                         actionBar
                             .barGlass()
                     }
-                    .padding(.horizontal, 28)
+                    .padding(.leading, 28)
+                    .padding(.trailing, sidebarVisible ? 340 : 28)
                     .padding(.bottom, 28)
                 }
                 .animation(.spring(duration: 0.35),
@@ -219,6 +222,7 @@ struct ContentView: View {
 
 struct EditorView: View {
     @EnvironmentObject private var state: AppState
+    var trailingInset: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -227,8 +231,10 @@ struct EditorView: View {
                 .lineSpacing(4)
                 .scrollContentBackground(.hidden)
                 .padding(8)
-                // Keep the last lines reachable above the floating glass bars.
+                // Keep the last lines reachable above the floating glass bars
+                // and clear of the floating settings panel.
                 .contentMargins(.bottom, 120, for: .scrollContent)
+                .contentMargins(.trailing, trailingInset, for: .scrollContent)
             if state.script.isEmpty {
                 Text("Type or paste your script here…")
                     .foregroundStyle(.secondary)
