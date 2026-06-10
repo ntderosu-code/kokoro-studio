@@ -5,26 +5,6 @@ import SwiftUI
 // bar) per HIG — content surfaces and the settings form stay standard.
 
 extension View {
-    /// Floating settings panel à la Music's sidebar: rounded glass slab,
-    /// inset from the window edges, its own layer.
-    @ViewBuilder
-    func panelGlass(cornerRadius: CGFloat = 18) -> some View {
-        if #available(macOS 26.0, *) {
-            self.clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-                .shadow(color: .black.opacity(0.12), radius: 14, y: 4)
-        } else {
-            self.background(.regularMaterial,
-                            in: RoundedRectangle(cornerRadius: cornerRadius))
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .strokeBorder(.quaternary)
-                )
-                .shadow(color: .black.opacity(0.12), radius: 14, y: 4)
-        }
-    }
-
     /// Floating-bar chrome: Liquid Glass on macOS 26+, material card below.
     @ViewBuilder
     func barGlass(cornerRadius: CGFloat = 14) -> some View {

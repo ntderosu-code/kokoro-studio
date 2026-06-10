@@ -3,7 +3,6 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var state: AppState
     @StateObject private var player = PlayerController()
-    @State private var sidebarVisible = true
     @State private var quickAddWord: String?
     @State private var showingExportSheet = false
     @State private var showingSaveProfile = false
@@ -26,26 +25,20 @@ struct ContentView: View {
     }
 
     var body: some View {
-        // The panel floats OVER the page so the page and script show through
-        // the glass — content beside glass has nothing to refract.
-        ZStack(alignment: .trailing) {
+        // Standard macOS architecture: NavigationSplitView's sidebar gets the
+        // system Liquid Glass floating-slab treatment on macOS 26 for free.
+        NavigationSplitView {
+            SidebarView()
+                .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 340)
+        } detail: {
             editorPane
-            if sidebarVisible {
-                SidebarView()
-                    .frame(width: 300)
-                    .panelGlass()
-                    .padding(.vertical, 12)
-                    .padding(.trailing, 12)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
+                .background(Color(nsColor: .windowBackgroundColor),
+                            ignoresSafeAreaEdges: .bottom)
         }
-        .animation(.spring(duration: 0.3), value: sidebarVisible)
-        .background(Color(nsColor: .windowBackgroundColor),
-                    ignoresSafeAreaEdges: .bottom)
     }
 
     private var editorPane: some View {
-        EditorView(trailingInset: sidebarVisible ? 312 : 0)
+        EditorView()
             .padding(14)
             .frame(minWidth: 380, maxWidth: .infinity,
                    minHeight: 200, maxHeight: .infinity)
@@ -62,8 +55,7 @@ struct ContentView: View {
                         actionBar
                             .barGlass()
                     }
-                    .padding(.leading, 28)
-                    .padding(.trailing, sidebarVisible ? 340 : 28)
+                    .padding(.horizontal, 28)
                     .padding(.bottom, 28)
                 }
                 .animation(.spring(duration: 0.35),
@@ -121,11 +113,6 @@ struct ContentView: View {
                 }
                 .keyboardShortcut("d", modifiers: .command)
                 .help("Add selected word to pronunciation dictionary (⌘D)")
-
-                Button("Settings", systemImage: "sidebar.right") {
-                    withAnimation { sidebarVisible.toggle() }
-                }
-                .help("Toggle settings sidebar")
             }
         }
         .sheet(isPresented: $showingExportSheet) {
@@ -222,7 +209,6 @@ struct ContentView: View {
 
 struct EditorView: View {
     @EnvironmentObject private var state: AppState
-    var trailingInset: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -231,15 +217,15 @@ struct EditorView: View {
                 .lineSpacing(4)
                 .scrollContentBackground(.hidden)
                 .padding(8)
-                // Keep the last lines reachable above the floating glass bars
-                // and clear of the floating settings panel.
+                // Keep the last lines reachable above the floating glass bars.
                 .contentMargins(.bottom, 120, for: .scrollContent)
-                .contentMargins(.trailing, trailingInset, for: .scrollContent)
             if state.script.isEmpty {
+                // Aligned to the text origin: 8 outer padding + NSTextView's
+                // 5pt container inset / line fragment padding.
                 Text("Type or paste your script here…")
                     .foregroundStyle(.secondary)
                     .font(.system(size: 14))
-                    .padding(.top, 16)
+                    .padding(.top, 13)
                     .padding(.leading, 13)
                     .allowsHitTesting(false)
             }
