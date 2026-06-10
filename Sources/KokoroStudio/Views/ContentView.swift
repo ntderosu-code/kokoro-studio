@@ -149,17 +149,23 @@ struct ContentView: View {
         }
     }
 
-    private var wordCount: Int {
-        state.script.split { $0.isWhitespace || $0.isNewline }.count
+    private var scriptSummary: String {
+        let words = DurationEstimator.wordCount(of: state.script)
+        guard words > 0 else { return "" }
+        let estimate = DurationEstimator.estimate(
+            script: state.script, pauses: state.pauseSettings,
+            wordsPerSecond: state.calibratedWordsPerSecond, speed: state.speed)
+        return "\(words) words · \(DurationEstimator.formatted(estimate))"
     }
 
     private var actionBar: some View {
         HStack(spacing: 12) {
             statusView
-            if !state.isGenerating {
-                Text("\(wordCount) words · \(state.script.count) characters")
+            if !state.isGenerating, !scriptSummary.isEmpty {
+                Text(scriptSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .help("Estimated audio length — calibrates from your actual generations")
             }
             Spacer()
             if state.isGenerating {

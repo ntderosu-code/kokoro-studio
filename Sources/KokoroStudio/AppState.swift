@@ -85,6 +85,8 @@ final class AppState: ObservableObject {
     @AppStorage("engineKind") private var engineKindRaw = TTSEngineKind.kokoro.rawValue
     @AppStorage("pocketVoicePath") var pocketVoicePath = ""
     @AppStorage("normalizeLoudness") var normalizeLoudness = true
+    @AppStorage("calibratedWordsPerSecond") var calibratedWordsPerSecond
+        = DurationEstimator.defaultWordsPerSecond
     @AppStorage("captionFormat") private var captionFormatRaw = CaptionFormat.off.rawValue
 
     var captionFormat: CaptionFormat {
@@ -281,7 +283,8 @@ final class AppState: ObservableObject {
                 await MainActor.run {
                     self.finishGeneration(samples: samples, sampleRate: sampleRate,
                                           cancelled: flag.isCancelled,
-                                          segmentResults: results)
+                                          segmentResults: results,
+                                          speed: Double(speedValue))
                 }
             } catch {
                 await MainActor.run {
@@ -295,10 +298,25 @@ final class AppState: ObservableObject {
 
     private func finishGeneration(samples rawSamples: [Float], sampleRate: Int,
                                   cancelled: Bool,
-                                  segmentResults: [(text: String, sampleCount: Int, pauseAfterMs: Int)]) {
+                                  segmentResults: [(text: String, sampleCount: Int, pauseAfterMs: Int)],
+                                  speed: Double) {
         phase = .ready
         currentCancellation = nil
         guard !cancelled, !rawSamples.isEmpty else { return }
+
+        // Calibrate the duration estimate from what was actually produced.
+        let spokenWords = segmentResults.reduce(0) {
+            $0 + DurationEstimator.wordCount(of: $1.text)
+        }
+        let pauseSeconds = segmentResults.reduce(0.0) {
+            $0 + Double($1.pauseAfterMs) / 1000
+        }
+        if let updated = DurationEstimator.calibrate(
+            previousRate: calibratedWordsPerSecond, words: spokenWords,
+            audioSeconds: Double(rawSamples.count) / Double(sampleRate),
+            pauseSeconds: pauseSeconds, speed: speed) {
+            calibratedWordsPerSecond = updated
+        }
 
         let samples: [Float]
         var cues = CaptionWriter.buildCues(segments: segmentResults,
