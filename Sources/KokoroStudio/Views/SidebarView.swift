@@ -6,9 +6,29 @@ struct SidebarView: View {
     @EnvironmentObject private var state: AppState
     @State private var showingDictionaryEditor = false
     @State private var showingCredits = false
+    @State private var showingSpeakers = false
+    @State private var showingSaveProfile = false
+    @State private var newProfileName = ""
+    @State private var profileNames = ProfileStore.list()
+    @State private var selectedProfile = ""
 
     private func pauseLabel(_ ms: Int) -> String {
         ms == 0 ? "Model default" : "\(ms) ms"
+    }
+
+    @ViewBuilder
+    private func pauseSlider(_ label: String, value: Binding<Int>,
+                             range: ClosedRange<Double>, help: String) -> some View {
+        LabeledContent(label) {
+            Text(pauseLabel(value.wrappedValue))
+                .monospacedDigit().foregroundStyle(.secondary)
+        }
+        Slider(value: Binding(get: { Double(value.wrappedValue) },
+                              set: { value.wrappedValue = Int($0) }),
+               in: range, step: 25) {
+            Text(label)
+        }
+        .help(help)
     }
 
     private func chooseVoiceSample() {
@@ -35,6 +55,35 @@ struct SidebarView: View {
 
     var body: some View {
         Form {
+            Section("Profile") {
+                Picker("Profile", selection: $selectedProfile) {
+                    Text("Custom").tag("")
+                    ForEach(profileNames, id: \.self) { name in
+                        Text(name).tag(name)
+                    }
+                }
+                .labelsHidden()
+                .onChange(of: selectedProfile) { _, name in
+                    if !name.isEmpty, let profile = ProfileStore.load(name: name) {
+                        state.apply(profile)
+                    }
+                }
+                HStack {
+                    Button("Save As…") {
+                        newProfileName = selectedProfile
+                        showingSaveProfile = true
+                    }
+                    if !selectedProfile.isEmpty {
+                        Button("Delete", role: .destructive) {
+                            ProfileStore.delete(name: selectedProfile)
+                            profileNames = ProfileStore.list()
+                            selectedProfile = ""
+                        }
+                    }
+                }
+                .controlSize(.small)
+            }
+
             Section("Engine") {
                 Picker("Engine", selection: Binding(
                     get: { state.engineKind },
@@ -65,6 +114,10 @@ struct SidebarView: View {
                     }
                     .labelsHidden()
                     .help("★ = recommended starting points")
+                    Button("Speakers…") {
+                        showingSpeakers = true
+                    }
+                    .help("Map @Name: script tags to voices for dialogue")
                 } else {
                     LabeledContent("Sample") {
                         Text(pocketVoiceName)
@@ -137,27 +190,25 @@ struct SidebarView: View {
             }
 
             Section("Pauses") {
-                LabeledContent("Paragraph") {
-                    Text(pauseLabel(state.paragraphPauseMs))
-                        .monospacedDigit().foregroundStyle(.secondary)
-                }
-                Slider(value: Binding(get: { Double(state.paragraphPauseMs) },
-                                      set: { state.paragraphPauseMs = Int($0) }),
-                       in: 0...1500, step: 50) {
-                    Text("Paragraph pause")
-                }
-                .help("Extra silence between paragraphs (blank or new lines)")
-
-                LabeledContent("Punctuation") {
-                    Text(pauseLabel(state.punctuationPauseMs))
-                        .monospacedDigit().foregroundStyle(.secondary)
-                }
-                Slider(value: Binding(get: { Double(state.punctuationPauseMs) },
-                                      set: { state.punctuationPauseMs = Int($0) }),
-                       in: 0...800, step: 25) {
-                    Text("Punctuation pause")
-                }
-                .help("Extra silence after . ! ? ; : , — 0 keeps the voice's natural rhythm")
+                pauseSlider("Paragraph", value: Binding(
+                    get: { state.paragraphPauseMs },
+                    set: { state.paragraphPauseMs = $0 }), range: 0...1500,
+                    help: "Extra silence between lines/paragraphs")
+                pauseSlider("Sentence", value: Binding(
+                    get: { state.sentencePauseMs },
+                    set: { state.sentencePauseMs = $0 }), range: 0...800,
+                    help: "Extra silence after . ! ? — 0 keeps natural rhythm")
+                pauseSlider("Clause", value: Binding(
+                    get: { state.clausePauseMs },
+                    set: { state.clausePauseMs = $0 }), range: 0...800,
+                    help: "Extra silence after , ; : — 0 keeps natural rhythm")
+                pauseSlider("Heading", value: Binding(
+                    get: { state.headingPauseMs },
+                    set: { state.headingPauseMs = $0 }), range: 0...2000,
+                    help: "Pause after lines starting with # — gives learners a beat at section breaks")
+                Text("Tip: type [pause:800] anywhere in the script for a deliberate beat.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Pronunciation") {
@@ -191,6 +242,82 @@ struct SidebarView: View {
         .sheet(isPresented: $showingCredits) {
             CreditsView()
         }
+        .sheet(isPresented: $showingSpeakers) {
+            SpeakersEditorView()
+        }
+        .alert("Save Profile", isPresented: $showingSaveProfile) {
+            TextField("Profile name", text: $newProfileName)
+            Button("Save") {
+                let name = newProfileName.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty else { return }
+                try? ProfileStore.save(state.currentProfile(), name: name)
+                profileNames = ProfileStore.list()
+                selectedProfile = name
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Saves engine, voice, speed, pauses, dictionary, and output settings under one name.")
+        }
+    }
+}
+
+/// Maps @Name: speaker tags found in the script to Kokoro voices.
+struct SpeakersEditorView: View {
+    @EnvironmentObject private var state: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    private var detectedSpeakers: [String] {
+        ScriptSegmenter.speakerNames(in: state.script)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Speakers").font(.headline)
+                Text("Start a line with @Name: to give it a speaker. " +
+                     "Lines without a tag use the main voice. Kokoro engine only.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+
+            Divider()
+
+            if detectedSpeakers.isEmpty {
+                VStack(spacing: 6) {
+                    Text("No speaker tags found in the script.")
+                        .foregroundStyle(.secondary)
+                    Text("Example:\n@Maya: Welcome to the clinic.\n@Sam: Thanks — first day!")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Form {
+                    ForEach(detectedSpeakers, id: \.self) { name in
+                        Picker(name, selection: Binding(
+                            get: { state.speakerVoices[name] ?? state.voiceID },
+                            set: { state.speakerVoices[name] = $0 })) {
+                            ForEach(VoiceCatalog.all) { voice in
+                                Text(voice.displayName).tag(voice.id)
+                            }
+                        }
+                    }
+                }
+                .formStyle(.grouped)
+            }
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+        .frame(width: 440, height: 360)
     }
 }
 

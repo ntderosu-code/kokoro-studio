@@ -51,8 +51,31 @@ final class AppState: ObservableObject {
     @AppStorage("exportFormat") private var exportFormatRaw = ExportFormat.wav.rawValue
     @AppStorage("outputFolderPath") var outputFolderPath = ""
     @AppStorage("paragraphPauseMs") var paragraphPauseMs = 500
-    @AppStorage("punctuationPauseMs") var punctuationPauseMs = 0
+    @AppStorage("sentencePauseMs") var sentencePauseMs = 0
+    @AppStorage("clausePauseMs") var clausePauseMs = 0
+    @AppStorage("headingPauseMs") var headingPauseMs = 800
     @AppStorage("pronunciationRules") var pronunciationRulesText = ""
+    @AppStorage("speakerVoices") var speakerVoicesJSON = ""
+
+    var pauseSettings: PauseSettings {
+        PauseSettings(paragraphMs: paragraphPauseMs, sentenceMs: sentencePauseMs,
+                      clauseMs: clausePauseMs, headingMs: headingPauseMs)
+    }
+
+    /// Speaker name -> Kokoro voice ID, persisted as JSON.
+    var speakerVoices: [String: Int] {
+        get {
+            guard let data = speakerVoicesJSON.data(using: .utf8),
+                  let map = try? JSONDecoder().decode([String: Int].self, from: data)
+            else { return [:] }
+            return map
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                speakerVoicesJSON = String(data: data, encoding: .utf8) ?? ""
+            }
+        }
+    }
     @AppStorage("engineKind") private var engineKindRaw = TTSEngineKind.kokoro.rawValue
     @AppStorage("pocketVoicePath") var pocketVoicePath = ""
     @AppStorage("normalizeLoudness") var normalizeLoudness = true
@@ -163,10 +186,10 @@ final class AppState: ObservableObject {
         let rules = PronunciationDictionary.parse(pronunciationRulesText)
         let processedScript = PronunciationDictionary.apply(rules, to: script)
         let segments = ScriptSegmenter.segment(processedScript,
-                                               paragraphPauseMs: paragraphPauseMs,
-                                               punctuationPauseMs: punctuationPauseMs,
+                                               pauses: pauseSettings,
                                                sentenceSplit: captionFormat != .off)
         let voice = voiceID
+        let speakerMap = speakerVoices
         let speedValue = Float(speed)
         let voiceReferenceURL = pocketVoiceURL
         let kokoroEngine = engine
@@ -174,16 +197,20 @@ final class AppState: ObservableObject {
 
         Task.detached(priority: .userInitiated) {
             do {
-                let synthesizeSegment: (String, @escaping (Float) -> Bool) -> [Float]
+                let synthesizeSegment: (ScriptSegment, @escaping (Float) -> Bool) -> [Float]
                 let sampleRate: Int
 
                 switch kind {
                 case .kokoro:
                     guard let kokoroEngine else { return }
                     sampleRate = kokoroEngine.sampleRate
-                    synthesizeSegment = { text, onProgress in
-                        kokoroEngine.synthesize(text: text, voiceID: voice,
-                                                speed: speedValue, progress: onProgress)
+                    synthesizeSegment = { segment, onProgress in
+                        let segmentVoice = segment.speaker
+                            .flatMap { speakerMap[$0] } ?? voice
+                        return kokoroEngine.synthesize(text: segment.text,
+                                                       voiceID: segmentVoice,
+                                                       speed: speedValue,
+                                                       progress: onProgress)
                     }
                 case .pocket:
                     let pocket: PocketEngine
@@ -203,8 +230,8 @@ final class AppState: ObservableObject {
                     }
                     let reference = try ReferenceAudioLoader.load(url: voiceReferenceURL)
                     sampleRate = pocket.sampleRate
-                    synthesizeSegment = { text, onProgress in
-                        pocket.synthesize(text: text,
+                    synthesizeSegment = { segment, onProgress in
+                        pocket.synthesize(text: segment.text,
                                           referenceAudio: reference.samples,
                                           referenceSampleRate: reference.sampleRate,
                                           speed: speedValue, progress: onProgress)
@@ -216,7 +243,14 @@ final class AppState: ObservableObject {
                 let segmentCount = max(segments.count, 1)
                 for (index, segment) in segments.enumerated() {
                     if flag.isCancelled { break }
-                    let segmentSamples = synthesizeSegment(segment.text) { progress in
+                    // Silence-only segments (from bare [pause] markers).
+                    if segment.text.isEmpty {
+                        let silenceFrames = sampleRate * segment.pauseAfterMs / 1000
+                        allSamples.append(contentsOf: [Float](repeating: 0, count: silenceFrames))
+                        segmentResults.append(("", 0, segment.pauseAfterMs))
+                        continue
+                    }
+                    let segmentSamples = synthesizeSegment(segment) { progress in
                         let overall = (Float(index) + progress) / Float(segmentCount)
                         Task { @MainActor in
                             if case .generating = self.phase {
@@ -324,6 +358,38 @@ final class AppState: ObservableObject {
         } catch {
             errorMessage = "Export failed: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Profiles
+
+    func currentProfile() -> Profile {
+        Profile(engineKind: engineKind.rawValue, voiceID: voiceID,
+                pocketVoicePath: pocketVoicePath, speed: speed,
+                paragraphPauseMs: paragraphPauseMs,
+                sentencePauseMs: sentencePauseMs,
+                clausePauseMs: clausePauseMs,
+                headingPauseMs: headingPauseMs,
+                pronunciationRules: pronunciationRulesText,
+                captionFormat: captionFormat.rawValue,
+                normalizeLoudness: normalizeLoudness,
+                exportFormat: exportFormat.rawValue,
+                speakerVoicesJSON: speakerVoicesJSON)
+    }
+
+    func apply(_ profile: Profile) {
+        engineKind = TTSEngineKind(rawValue: profile.engineKind) ?? .kokoro
+        voiceID = profile.voiceID
+        pocketVoicePath = profile.pocketVoicePath
+        speed = profile.speed
+        paragraphPauseMs = profile.paragraphPauseMs
+        sentencePauseMs = profile.sentencePauseMs
+        clausePauseMs = profile.clausePauseMs
+        headingPauseMs = profile.headingPauseMs
+        pronunciationRulesText = profile.pronunciationRules
+        captionFormat = CaptionFormat(rawValue: profile.captionFormat) ?? .off
+        normalizeLoudness = profile.normalizeLoudness
+        exportFormat = ExportFormat(rawValue: profile.exportFormat) ?? .wav
+        speakerVoicesJSON = profile.speakerVoicesJSON
     }
 
     func chooseOutputFolder() {

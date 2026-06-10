@@ -42,7 +42,9 @@ final class CaptionWriterTests: XCTestCase {
     func testSentenceSplitForCaptions() {
         let segments = ScriptSegmenter.segment(
             "One sentence. Another one! A third?",
-            paragraphPauseMs: 0, punctuationPauseMs: 0, sentenceSplit: true)
+            pauses: PauseSettings(paragraphMs: 0, sentenceMs: 0,
+                                  clauseMs: 0, headingMs: 0),
+            sentenceSplit: true)
         XCTAssertEqual(segments.map(\.text),
                        ["One sentence.", "Another one!", "A third?"])
         XCTAssertTrue(segments.allSatisfy { $0.pauseAfterMs == 0 })

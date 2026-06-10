@@ -70,44 +70,113 @@ final class PronunciationDictionaryTests: XCTestCase {
 }
 
 final class ScriptSegmenterTests: XCTestCase {
+    func pauses(paragraph: Int = 0, sentence: Int = 0, clause: Int = 0,
+                heading: Int = 0) -> PauseSettings {
+        PauseSettings(paragraphMs: paragraph, sentenceMs: sentence,
+                      clauseMs: clause, headingMs: heading)
+    }
+
     func testZeroPausesPassThrough() {
         let segments = ScriptSegmenter.segment("Hello, world.\nNew line.",
-                                               paragraphPauseMs: 0,
-                                               punctuationPauseMs: 0)
+                                               pauses: pauses())
         XCTAssertEqual(segments,
                        [ScriptSegment(text: "Hello, world.\nNew line.", pauseAfterMs: 0)])
     }
 
     func testParagraphSplit() {
         let segments = ScriptSegmenter.segment("First paragraph.\n\nSecond paragraph.",
-                                               paragraphPauseMs: 500,
-                                               punctuationPauseMs: 0)
+                                               pauses: pauses(paragraph: 500))
         XCTAssertEqual(segments, [
             ScriptSegment(text: "First paragraph.", pauseAfterMs: 500),
             ScriptSegment(text: "Second paragraph.", pauseAfterMs: 0),
         ])
     }
 
-    func testPunctuationSplitKeepsDelimiters() {
+    func testSentenceAndClausePausesDiffer() {
         let segments = ScriptSegmenter.segment("Hello, world. Done",
-                                               paragraphPauseMs: 0,
-                                               punctuationPauseMs: 200)
+                                               pauses: pauses(sentence: 300, clause: 100))
         XCTAssertEqual(segments, [
-            ScriptSegment(text: "Hello,", pauseAfterMs: 200),
-            ScriptSegment(text: "world.", pauseAfterMs: 200),
+            ScriptSegment(text: "Hello,", pauseAfterMs: 100),
+            ScriptSegment(text: "world.", pauseAfterMs: 300),
             ScriptSegment(text: "Done", pauseAfterMs: 0),
         ])
     }
 
+    func testSentencePauseOnlyDoesNotSplitClauses() {
+        let segments = ScriptSegmenter.segment("Hello, world. Done",
+                                               pauses: pauses(sentence: 300))
+        XCTAssertEqual(segments.map(\.text), ["Hello, world.", "Done"])
+    }
+
+    func testInlinePauseMarker() {
+        let segments = ScriptSegmenter.segment("Key term[pause:800] explained here.",
+                                               pauses: pauses(paragraph: 500))
+        XCTAssertEqual(segments, [
+            ScriptSegment(text: "Key term", pauseAfterMs: 800),
+            ScriptSegment(text: "explained here.", pauseAfterMs: 0),
+        ])
+    }
+
+    func testInlinePauseMarkerDefaultDuration() {
+        let segments = ScriptSegmenter.segment("Wait[pause] go.",
+                                               pauses: pauses())
+        XCTAssertEqual(segments.first?.pauseAfterMs,
+                       PauseSettings.defaultInlineMarkerMs)
+    }
+
+    func testHeadingGetsHeadingPause() {
+        let segments = ScriptSegmenter.segment("# Section One\nBody text.",
+                                               pauses: pauses(paragraph: 400, heading: 1000))
+        XCTAssertEqual(segments, [
+            ScriptSegment(text: "Section One", pauseAfterMs: 1000),
+            ScriptSegment(text: "Body text.", pauseAfterMs: 0),
+        ])
+    }
+
+    func testSpeakerTags() {
+        let script = """
+        @Maya: Welcome to the clinic.
+        @Sam: Thanks!
+        Narration continues here.
+        """
+        let segments = ScriptSegmenter.segment(script, pauses: pauses(paragraph: 300))
+        XCTAssertEqual(segments.map(\.speaker), ["Maya", "Sam", "Sam"])
+        // NOTE: untagged lines inherit the previous speaker by design — a
+        // speaker keeps talking until another tag appears.
+        XCTAssertEqual(segments.map(\.text),
+                       ["Welcome to the clinic.", "Thanks!", "Narration continues here."])
+    }
+
+    func testSpeakerNamesDetection() {
+        XCTAssertEqual(ScriptSegmenter.speakerNames(
+            in: "@Maya: hi\n@Sam: yo\n@Maya: again"), ["Maya", "Sam"])
+    }
+
     func testEllipsisDoesNotCreateEmptySegments() {
         let segments = ScriptSegmenter.segment("Wait... what?",
-                                               paragraphPauseMs: 0,
-                                               punctuationPauseMs: 150)
+                                               pauses: pauses(sentence: 150))
         XCTAssertEqual(segments.map(\.text), ["Wait...", "what?"])
     }
 
     func testEmptyScript() {
-        XCTAssertTrue(ScriptSegmenter.segment("  \n ", paragraphPauseMs: 500,
-                                              punctuationPauseMs: 100).isEmpty)
+        XCTAssertTrue(ScriptSegmenter.segment("  \n ",
+                                              pauses: pauses(paragraph: 500)).isEmpty)
+    }
+}
+
+final class ProfileStoreTests: XCTestCase {
+    func testRoundTrip() throws {
+        let name = "test-profile-\(UUID().uuidString)"
+        defer { ProfileStore.delete(name: name) }
+        let profile = Profile(engineKind: "kokoro", voiceID: 7,
+                              pocketVoicePath: "", speed: 1.2,
+                              paragraphPauseMs: 450, sentencePauseMs: 200,
+                              clausePauseMs: 50, headingPauseMs: 900,
+                              pronunciationRules: "APA = @letters",
+                              captionFormat: "vtt", normalizeLoudness: true,
+                              exportFormat: "m4a", speakerVoicesJSON: "{\"Maya\":2}")
+        try ProfileStore.save(profile, name: name)
+        XCTAssertTrue(ProfileStore.list().contains(name))
+        XCTAssertEqual(ProfileStore.load(name: name), profile)
     }
 }
