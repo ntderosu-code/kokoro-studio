@@ -9,6 +9,7 @@ let package = Package(
         .executableTarget(
             name: "KokoroStudio",
             dependencies: ["CSherpaOnnx"],
+            exclude: ["CLAUDE.md", "Views/CLAUDE.md"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Lvendor/sherpa-onnx/lib",
