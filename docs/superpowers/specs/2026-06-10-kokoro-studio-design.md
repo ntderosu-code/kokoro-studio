@@ -14,8 +14,12 @@ settings sidebar on the right, player bar at the bottom.
 - **Stack:** Native SwiftUI app (macOS 14+) using **sherpa-onnx** to run the
   Kokoro ONNX model. No Python, no network at runtime.
 - **Model files:** Bundled inside the .app (`Contents/Resources/model/`):
-  Kokoro int8 ONNX (~90MB), `voices.bin`, `tokens.txt`, `espeak-ng-data`.
-  App download ≈ 150MB, works offline from first launch.
+  **kokoro-multi-lang-v1_0** (Kokoro 1.0, fp32, 53 voices including the full
+  classic English set: af_heart, af_bella, am_adam, bm_george, …) plus
+  `voices.bin`, `tokens.txt`, lexicons, `espeak-ng-data`, `dict/`.
+  App download ≈ 400MB, works offline from first launch.
+  (User-confirmed: int8 only exists for the v1.1 Chinese-focused release with
+  3 English voices — full voice set was chosen over smaller download.)
 - **Outputs:** In-app playback preview, WAV export, M4A/AAC export
   (AVFoundation encoder). No MP3 in v1.
 - **Distribution:** zip/DMG, ad-hoc codesigned. Notarization deferred.
