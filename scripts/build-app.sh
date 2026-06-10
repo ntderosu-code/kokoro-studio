@@ -1,7 +1,20 @@
 #!/bin/bash
 # scripts/build-app.sh — build release binary and assemble self-contained Kokoro Studio.app
+#
+# Usage:
+#   ./scripts/build-app.sh                 ad-hoc signed (local use / right-click-Open)
+#   ./scripts/build-app.sh --release       Developer ID sign + notarize + staple + zip
+#
+# --release expects:
+#   - a "Developer ID Application" cert in the keychain (SIGN_IDENTITY below)
+#   - notarytool keychain profile "kokoro" (xcrun notarytool store-credentials kokoro ...)
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+RELEASE=false
+[ "${1:-}" = "--release" ] && RELEASE=true
+SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application: BYRON ROBERT ROUSH (C25Q3Q4YFN)}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-kokoro}"
 
 swift build -c release
 
@@ -54,6 +67,26 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict></plist>
 PLIST
 
-codesign --force --deep --sign - "$APP"
+if $RELEASE; then
+  echo "Signing with: $SIGN_IDENTITY"
+  # Sign nested code first, then the app. Hardened runtime + secure
+  # timestamp are required for notarization.
+  codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" \
+    "$APP/Contents/Frameworks/"*.dylib
+  codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+  codesign --verify --deep --strict "$APP"
+
+  echo "Submitting for notarization (uploads ~370MB, takes minutes)..."
+  ditto -c -k --keepParent "$APP" build/KokoroStudio.zip
+  xcrun notarytool submit build/KokoroStudio.zip \
+    --keychain-profile "$NOTARY_PROFILE" --wait
+
+  xcrun stapler staple "$APP"
+  ditto -c -k --keepParent "$APP" build/KokoroStudio.zip
+  echo "Notarized and stapled: build/KokoroStudio.zip"
+else
+  codesign --force --deep --sign - "$APP"
+fi
+
 echo "Built: $APP"
 du -sh "$APP"
