@@ -7,10 +7,6 @@ struct SidebarView: View {
     @State private var showingDictionaryEditor = false
     @State private var showingCredits = false
     @State private var showingSpeakers = false
-    @State private var showingSaveProfile = false
-    @State private var newProfileName = ""
-    @State private var profileNames = ProfileStore.list()
-    @State private var selectedProfile = ""
 
     private func pauseLabel(_ ms: Int) -> String {
         ms == 0 ? "Model default" : "\(ms) ms"
@@ -42,12 +38,6 @@ struct SidebarView: View {
         }
     }
 
-    private var outputFolderName: String {
-        state.outputFolderPath.isEmpty
-            ? "Ask on export"
-            : URL(fileURLWithPath: state.outputFolderPath).lastPathComponent
-    }
-
     private var pocketVoiceName: String {
         guard let url = state.pocketVoiceURL else { return "None" }
         return url.deletingPathExtension().lastPathComponent.capitalized
@@ -55,35 +45,6 @@ struct SidebarView: View {
 
     var body: some View {
         Form {
-            Section("Profile") {
-                Picker("Profile", selection: $selectedProfile) {
-                    Text("Custom").tag("")
-                    ForEach(profileNames, id: \.self) { name in
-                        Text(name).tag(name)
-                    }
-                }
-                .labelsHidden()
-                .onChange(of: selectedProfile) { _, name in
-                    if !name.isEmpty, let profile = ProfileStore.load(name: name) {
-                        state.apply(profile)
-                    }
-                }
-                HStack {
-                    Button("Save As…") {
-                        newProfileName = selectedProfile
-                        showingSaveProfile = true
-                    }
-                    if !selectedProfile.isEmpty {
-                        Button("Delete", role: .destructive) {
-                            ProfileStore.delete(name: selectedProfile)
-                            profileNames = ProfileStore.list()
-                            selectedProfile = ""
-                        }
-                    }
-                }
-                .controlSize(.small)
-            }
-
             Section("Engine") {
                 Picker("Engine", selection: Binding(
                     get: { state.engineKind },
@@ -152,43 +113,6 @@ struct SidebarView: View {
                 }
             }
 
-            Section("Output") {
-                Picker("Format", selection: Binding(
-                    get: { state.exportFormat },
-                    set: { state.exportFormat = $0 })) {
-                    ForEach(ExportFormat.allCases) { format in
-                        Text(format.label).tag(format)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-
-                Picker("Captions", selection: Binding(
-                    get: { state.captionFormat },
-                    set: { state.captionFormat = $0 })) {
-                    ForEach(CaptionFormat.allCases) { format in
-                        Text(format.label).tag(format)
-                    }
-                }
-                .help("Export a synced caption file next to the audio — cues follow sentences and pauses")
-
-                Toggle("Normalize loudness", isOn: $state.normalizeLoudness)
-                    .help("Trim silence, level volume to -1 dBFS, and add micro fades — keeps every clip at the same loudness")
-
-                LabeledContent("Folder") {
-                    Text(outputFolderName)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .foregroundStyle(.secondary)
-                        .help(state.outputFolderPath.isEmpty
-                              ? "You'll be asked where to save on first export"
-                              : state.outputFolderPath)
-                }
-                Button("Choose Folder…") {
-                    state.chooseOutputFolder()
-                }
-            }
-
             Section("Pauses") {
                 pauseSlider("Paragraph", value: Binding(
                     get: { state.paragraphPauseMs },
@@ -246,6 +170,9 @@ struct SidebarView: View {
             }
         }
         .formStyle(.grouped)
+        // Let the inspector's translucent material show through instead of
+        // the form's opaque background.
+        .scrollContentBackground(.hidden)
         .sheet(isPresented: $showingDictionaryEditor) {
             DictionaryEditorView(rulesText: $state.pronunciationRulesText)
         }
@@ -254,19 +181,6 @@ struct SidebarView: View {
         }
         .sheet(isPresented: $showingSpeakers) {
             SpeakersEditorView()
-        }
-        .alert("Save Profile", isPresented: $showingSaveProfile) {
-            TextField("Profile name", text: $newProfileName)
-            Button("Save") {
-                let name = newProfileName.trimmingCharacters(in: .whitespaces)
-                guard !name.isEmpty else { return }
-                try? ProfileStore.save(state.currentProfile(), name: name)
-                profileNames = ProfileStore.list()
-                selectedProfile = name
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Saves engine, voice, speed, pauses, dictionary, and output settings under one name.")
         }
     }
 }

@@ -5,6 +5,11 @@ struct ContentView: View {
     @StateObject private var player = PlayerController()
     @State private var sidebarVisible = true
     @State private var quickAddWord: String?
+    @State private var showingExportSheet = false
+    @State private var showingSaveProfile = false
+    @State private var newProfileName = ""
+    @State private var profileNames = ProfileStore.list()
+    @State private var selectedProfile = ""
 
     /// Reads the current selection from the focused text view (the script
     /// editor). SwiftUI's TextEditor exposes no selection binding on macOS,
@@ -21,34 +26,90 @@ struct ContentView: View {
     }
 
     var body: some View {
-        HSplitView {
-            EditorView()
-                .frame(minWidth: 380, maxWidth: .infinity,
-                       minHeight: 200, maxHeight: .infinity)
-            if sidebarVisible {
-                SidebarView()
-                    .frame(minWidth: 230, idealWidth: 270, maxWidth: 340)
-            }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        EditorView()
+            .frame(minWidth: 380, maxWidth: .infinity,
+                   minHeight: 200, maxHeight: .infinity)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
             BarGlassContainer(spacing: 10) {
-                VStack(spacing: 10) {
-                    if state.lastAudio != nil {
-                        PlayerBar(player: player)
-                            .barGlass()
-                    }
-                    actionBar
+                if state.lastAudio != nil {
+                    PlayerBar(player: player)
                         .barGlass()
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+                        .padding(.top, 4)
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
-                .padding(.top, 4)
             }
             .animation(.spring(duration: 0.35),
                        value: state.lastAudio?.previewWAV)
         }
+        .inspector(isPresented: $sidebarVisible) {
+            SidebarView()
+                .inspectorColumnWidth(min: 240, ideal: 290, max: 360)
+        }
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                Menu {
+                    Picker("Profile", selection: $selectedProfile) {
+                        Text("Custom").tag("")
+                        ForEach(profileNames, id: \.self) { name in
+                            Text(name).tag(name)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    Divider()
+                    Button("Save Current As…") {
+                        newProfileName = selectedProfile
+                        showingSaveProfile = true
+                    }
+                    if !selectedProfile.isEmpty {
+                        Button("Delete \"\(selectedProfile)\"", role: .destructive) {
+                            ProfileStore.delete(name: selectedProfile)
+                            profileNames = ProfileStore.list()
+                            selectedProfile = ""
+                        }
+                    }
+                } label: {
+                    Label(selectedProfile.isEmpty ? "Profile" : selectedProfile,
+                          systemImage: "square.stack")
+                }
+                .help("Apply, save, or delete settings profiles")
+                .onChange(of: selectedProfile) { _, name in
+                    if !name.isEmpty, let profile = ProfileStore.load(name: name) {
+                        state.apply(profile)
+                    }
+                }
+            }
+
             ToolbarItemGroup {
+                statusView
+
+                if state.isGenerating {
+                    Button("Stop", systemImage: "stop.fill") {
+                        state.cancelGeneration()
+                    }
+                    .help("Stop generation")
+                } else {
+                    Button {
+                        player.stop()
+                        state.generate()
+                    } label: {
+                        Label(state.lastAudio == nil ? "Generate" : "Re-generate",
+                              systemImage: "waveform")
+                    }
+                    .prominentActionButtonStyle()
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!state.canGenerate)
+                    .help("Generate speech (⌘↩)")
+                }
+
+                Button("Export", systemImage: "square.and.arrow.up") {
+                    showingExportSheet = true
+                }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(state.lastAudio == nil)
+                .help("Export audio and captions (⌘S)")
+
                 Button("Add to Dictionary", systemImage: "character.book.closed") {
                     if let selection = selectedEditorText() {
                         quickAddWord = selection
@@ -66,6 +127,22 @@ struct ContentView: View {
                 .help("Toggle settings sidebar")
             }
         }
+        .sheet(isPresented: $showingExportSheet) {
+            ExportSheet()
+        }
+        .alert("Save Profile", isPresented: $showingSaveProfile) {
+            TextField("Profile name", text: $newProfileName)
+            Button("Save") {
+                let name = newProfileName.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty else { return }
+                try? ProfileStore.save(state.currentProfile(), name: name)
+                profileNames = ProfileStore.list()
+                selectedProfile = name
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Saves engine, voice, speed, pauses, dictionary, and output settings under one name.")
+        }
         .sheet(item: Binding(
             get: { quickAddWord.map(QuickAddTarget.init) },
             set: { quickAddWord = $0?.word })) { target in
@@ -82,37 +159,6 @@ struct ContentView: View {
         } message: {
             Text(state.errorMessage ?? "")
         }
-    }
-
-    private var actionBar: some View {
-        HStack(spacing: 12) {
-            statusView
-            Spacer()
-            if state.isGenerating {
-                Button("Stop", systemImage: "stop.fill") {
-                    state.cancelGeneration()
-                }
-                .secondaryActionButtonStyle()
-                .controlSize(.large)
-                .help("Stop generation")
-            } else {
-                Button {
-                    player.stop()
-                    state.generate()
-                } label: {
-                    Label(state.lastAudio == nil ? "Generate" : "Re-generate",
-                          systemImage: "waveform")
-                        .frame(minWidth: 110)
-                }
-                .prominentActionButtonStyle()
-                .controlSize(.large)
-                .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!state.canGenerate)
-                .help("Generate speech (⌘↩)")
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
     }
 
     @ViewBuilder

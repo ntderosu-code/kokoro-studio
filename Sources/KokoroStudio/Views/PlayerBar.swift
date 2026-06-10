@@ -35,13 +35,6 @@ struct PlayerBar: View {
             Text(timeString(player.duration))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
-
-            Button("Export", systemImage: "square.and.arrow.down") {
-                state.export()
-            }
-            .secondaryActionButtonStyle()
-            .keyboardShortcut("s", modifiers: .command)
-            .help("Export as \(state.exportFormat.label) (⌘S)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
