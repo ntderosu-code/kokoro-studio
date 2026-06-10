@@ -27,6 +27,8 @@ struct ContentView: View {
 
     var body: some View {
         EditorView()
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
             .frame(minWidth: 380, maxWidth: .infinity,
                    minHeight: 200, maxHeight: .infinity)
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -47,6 +49,9 @@ struct ContentView: View {
             .animation(.spring(duration: 0.35),
                        value: state.lastAudio?.previewWAV)
         }
+        // The "desk" the page card and glass controls sit on.
+        .background(Color(nsColor: .underPageBackgroundColor),
+                    ignoresSafeAreaEdges: .all)
         .inspector(isPresented: $sidebarVisible) {
             SidebarView()
                 .inspectorColumnWidth(min: 240, ideal: 290, max: 360)
@@ -229,5 +234,11 @@ struct EditorView: View {
             .padding(.vertical, 5)
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(.quaternary)
+        )
+        .shadow(color: .black.opacity(0.10), radius: 10, y: 2)
     }
 }
