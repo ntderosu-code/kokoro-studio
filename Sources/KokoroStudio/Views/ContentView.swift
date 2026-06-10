@@ -26,6 +26,23 @@ struct ContentView: View {
     }
 
     var body: some View {
+        HStack(spacing: 0) {
+            editorPane
+            if sidebarVisible {
+                SidebarView()
+                    .frame(width: 300)
+                    .panelGlass()
+                    .padding(.vertical, 12)
+                    .padding(.trailing, 12)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.3), value: sidebarVisible)
+        .background(Color(nsColor: .windowBackgroundColor),
+                    ignoresSafeAreaEdges: .bottom)
+    }
+
+    private var editorPane: some View {
         EditorView()
             .padding(14)
             .frame(minWidth: 380, maxWidth: .infinity,
@@ -49,12 +66,6 @@ struct ContentView: View {
                 .animation(.spring(duration: 0.35),
                            value: state.lastAudio?.previewWAV)
             }
-        .background(Color(nsColor: .windowBackgroundColor),
-                    ignoresSafeAreaEdges: .bottom)
-        .inspector(isPresented: $sidebarVisible) {
-            SidebarView()
-                .inspectorColumnWidth(min: 240, ideal: 290, max: 360)
-        }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Menu {
