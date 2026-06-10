@@ -30,6 +30,7 @@ for dylib in vendor/sherpa-onnx/lib/*.dylib; do
   fi
 done
 cp -R vendor/model "$APP/Contents/Resources/model"
+cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # Rewrite any absolute/local dylib references to @rpath so the bundled
 # copies in Contents/Frameworks are used (the binary already carries an
@@ -61,6 +62,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleExecutable</key><string>Kokoro Studio</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>Local Kokoro TTS via sherpa-onnx</string>

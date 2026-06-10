@@ -61,6 +61,18 @@ struct SidebarView: View {
                     state.chooseOutputFolder()
                 }
             }
+
+            Section("Made with") {
+                Link("Kokoro model — hexgrad (Apache-2.0)",
+                     destination: URL(string: "https://huggingface.co/hexgrad/Kokoro-82M")!)
+                Link("sherpa-onnx — k2-fsa (Apache-2.0)",
+                     destination: URL(string: "https://github.com/k2-fsa/sherpa-onnx")!)
+                Link("ONNX Runtime — Microsoft (MIT)",
+                     destination: URL(string: "https://github.com/microsoft/onnxruntime")!)
+                Link("eSpeak NG data (GPL-3.0)",
+                     destination: URL(string: "https://github.com/espeak-ng/espeak-ng")!)
+            }
+            .font(.caption)
         }
         .formStyle(.grouped)
     }

@@ -51,7 +51,19 @@ voices use the `af_`/`am_` (American) and `bf_`/`bm_` (British) prefixes —
 e.g. `af_heart`, `af_bella`, `am_adam`, `bm_george`. The remaining voices
 cover Spanish, French, Hindi, Italian, Japanese, Portuguese, and Chinese.
 
-## Licenses
+## Acknowledgements
 
-- Kokoro model weights: Apache-2.0
-- sherpa-onnx: Apache-2.0
+Kokoro Studio is a thin GUI over excellent open source work:
+
+- **[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)** by hexgrad — the
+  TTS model itself (Apache-2.0). The bundled `kokoro-multi-lang-v1_0` ONNX
+  conversion is published by the sherpa-onnx project.
+- **[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)** by k2-fsa /
+  next-gen Kaldi — the on-device inference runtime (Apache-2.0).
+- **[ONNX Runtime](https://github.com/microsoft/onnxruntime)** by Microsoft —
+  the underlying inference engine (MIT).
+- **[eSpeak NG](https://github.com/espeak-ng/espeak-ng)** — phonemization data
+  bundled with the model (GPL-3.0).
+
+License texts for the bundled model ship inside the app at
+`Contents/Resources/model/LICENSE`.

@@ -16,6 +16,8 @@ struct ContentView: View {
                         .frame(minWidth: 230, idealWidth: 270, maxWidth: 340)
                 }
             }
+            Divider()
+            actionBar
             if state.lastAudio != nil {
                 Divider()
                 PlayerBar(player: player)
@@ -23,21 +25,6 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup {
-                statusView
-                if state.isGenerating {
-                    Button("Stop", systemImage: "stop.fill") {
-                        state.cancelGeneration()
-                    }
-                    .help("Stop generation")
-                } else {
-                    Button("Generate", systemImage: "waveform") {
-                        player.stop()
-                        state.generate()
-                    }
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(!state.canGenerate)
-                    .help("Generate speech (⌘↩)")
-                }
                 Button("Settings", systemImage: "sidebar.right") {
                     withAnimation { sidebarVisible.toggle() }
                 }
@@ -54,6 +41,37 @@ struct ContentView: View {
         } message: {
             Text(state.errorMessage ?? "")
         }
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: 12) {
+            statusView
+            Spacer()
+            if state.isGenerating {
+                Button("Stop", systemImage: "stop.fill") {
+                    state.cancelGeneration()
+                }
+                .controlSize(.large)
+                .help("Stop generation")
+            } else {
+                Button {
+                    player.stop()
+                    state.generate()
+                } label: {
+                    Label(state.lastAudio == nil ? "Generate" : "Re-generate",
+                          systemImage: "waveform")
+                        .frame(minWidth: 110)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(!state.canGenerate)
+                .help("Generate speech (⌘↩)")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.bar)
     }
 
     @ViewBuilder
