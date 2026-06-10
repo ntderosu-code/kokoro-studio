@@ -54,6 +54,7 @@ final class AppState: ObservableObject {
     @AppStorage("pronunciationRules") var pronunciationRulesText = ""
     @AppStorage("engineKind") private var engineKindRaw = TTSEngineKind.kokoro.rawValue
     @AppStorage("pocketVoicePath") var pocketVoicePath = ""
+    @AppStorage("normalizeLoudness") var normalizeLoudness = true
 
     var engineKind: TTSEngineKind {
         get { TTSEngineKind(rawValue: engineKindRaw) ?? .kokoro }
@@ -236,10 +237,14 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func finishGeneration(samples: [Float], sampleRate: Int, cancelled: Bool) {
+    private func finishGeneration(samples rawSamples: [Float], sampleRate: Int,
+                                  cancelled: Bool) {
         phase = .ready
         currentCancellation = nil
-        guard !cancelled, !samples.isEmpty else { return }
+        guard !cancelled, !rawSamples.isEmpty else { return }
+        let samples = normalizeLoudness
+            ? AudioProcessing.finalize(samples: rawSamples, sampleRate: sampleRate)
+            : rawSamples
         do {
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("kokoro-preview-\(UUID().uuidString)")

@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct SidebarView: View {
     @EnvironmentObject private var state: AppState
     @State private var showingDictionaryEditor = false
+    @State private var showingCredits = false
 
     private func pauseLabel(_ ms: Int) -> String {
         ms == 0 ? "Model default" : "\(ms) ms"
@@ -57,12 +58,13 @@ struct SidebarView: View {
                         ForEach(VoiceCatalog.grouped, id: \.label) { group in
                             Section(group.label) {
                                 ForEach(group.voices) { voice in
-                                    Text(voice.name).tag(voice.id)
+                                    Text(voice.displayName).tag(voice.id)
                                 }
                             }
                         }
                     }
                     .labelsHidden()
+                    .help("★ = recommended starting points")
                 } else {
                     LabeledContent("Sample") {
                         Text(pocketVoiceName)
@@ -107,6 +109,9 @@ struct SidebarView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+
+                Toggle("Normalize loudness", isOn: $state.normalizeLoudness)
+                    .help("Trim silence, level volume to -1 dBFS, and add micro fades — keeps every clip at the same loudness")
 
                 LabeledContent("Folder") {
                     Text(outputFolderName)
@@ -157,24 +162,90 @@ struct SidebarView: View {
                 }
             }
 
-            Section("Made with") {
-                Link("Kokoro model — hexgrad (Apache-2.0)",
-                     destination: URL(string: "https://huggingface.co/hexgrad/Kokoro-82M")!)
-                Link("Pocket TTS — Kyutai (CC-BY-4.0)",
-                     destination: URL(string: "https://github.com/kyutai-labs/pocket-tts")!)
-                Link("sherpa-onnx — k2-fsa (Apache-2.0)",
-                     destination: URL(string: "https://github.com/k2-fsa/sherpa-onnx")!)
-                Link("ONNX Runtime — Microsoft (MIT)",
-                     destination: URL(string: "https://github.com/microsoft/onnxruntime")!)
-                Link("eSpeak NG data (GPL-3.0)",
-                     destination: URL(string: "https://github.com/espeak-ng/espeak-ng")!)
+            Section {
+                Button {
+                    showingCredits = true
+                } label: {
+                    Label("Proudly built upon open source software",
+                          systemImage: "heart")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("View credits")
             }
-            .font(.caption)
         }
         .formStyle(.grouped)
         .sheet(isPresented: $showingDictionaryEditor) {
             DictionaryEditorView(rulesText: $state.pronunciationRulesText)
         }
+        .sheet(isPresented: $showingCredits) {
+            CreditsView()
+        }
+    }
+}
+
+struct CreditsView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private struct Credit: Identifiable {
+        let id = UUID()
+        let name: String
+        let detail: String
+        let url: String
+    }
+
+    private let credits: [Credit] = [
+        Credit(name: "Kokoro-82M", detail: "TTS model by hexgrad · Apache-2.0",
+               url: "https://huggingface.co/hexgrad/Kokoro-82M"),
+        Credit(name: "Pocket TTS", detail: "Voice-cloning model by Kyutai · CC-BY-4.0",
+               url: "https://github.com/kyutai-labs/pocket-tts"),
+        Credit(name: "sherpa-onnx", detail: "On-device inference runtime by k2-fsa · Apache-2.0",
+               url: "https://github.com/k2-fsa/sherpa-onnx"),
+        Credit(name: "ONNX Runtime", detail: "Inference engine by Microsoft · MIT",
+               url: "https://github.com/microsoft/onnxruntime"),
+        Credit(name: "eSpeak NG", detail: "Phonemization data · GPL-3.0",
+               url: "https://github.com/espeak-ng/espeak-ng"),
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 4) {
+                Image(systemName: "heart.fill")
+                    .font(.title2)
+                    .foregroundStyle(.pink)
+                Text("Built on open source")
+                    .font(.headline)
+                Text("Kokoro Studio is a thin GUI over excellent open source work.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+
+            Divider()
+
+            List(credits) { credit in
+                VStack(alignment: .leading, spacing: 2) {
+                    Link(credit.name, destination: URL(string: credit.url)!)
+                        .font(.body.weight(.medium))
+                    Text(credit.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 3)
+            }
+            .scrollContentBackground(.hidden)
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+        .frame(width: 400, height: 380)
     }
 }
 

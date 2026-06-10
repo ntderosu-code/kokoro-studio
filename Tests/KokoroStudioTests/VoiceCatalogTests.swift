@@ -24,4 +24,14 @@ final class VoiceCatalogTests: XCTestCase {
     func testVoiceForUnknownIDFallsBack() {
         XCTAssertEqual(VoiceCatalog.voice(forID: 999).name, "af_heart")
     }
+
+    func testRecommendedVoices() {
+        let recommended = VoiceCatalog.all.filter(\.recommended).map(\.name)
+        XCTAssertEqual(recommended, ["af_bella", "af_heart", "bm_george"])
+    }
+
+    func testDisplayNameFormatting() {
+        XCTAssertEqual(VoiceCatalog.all[3].displayName, "★ af_heart — warm, expressive")
+        XCTAssertEqual(VoiceCatalog.all[30].displayName, "ff_siwis")
+    }
 }
