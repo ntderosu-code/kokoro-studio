@@ -22,8 +22,9 @@ struct SidebarView: View {
         Slider(value: Binding(get: { Double(value.wrappedValue) },
                               set: { value.wrappedValue = Int($0) }),
                in: range, step: 25) {
-            Text(label)
+            Text(label) // VoiceOver only — visible label is the row above
         }
+        .labelsHidden()
         .help(help)
     }
 
@@ -105,12 +106,13 @@ struct SidebarView: View {
                         .foregroundStyle(.secondary)
                 }
                 Slider(value: $state.speed, in: 0.5...2.0, step: 0.05) {
-                    Text("Speed")
+                    Text("Speed") // VoiceOver only — visible label is the row above
                 } minimumValueLabel: {
                     Text("0.5×").font(.caption2)
                 } maximumValueLabel: {
                     Text("2×").font(.caption2)
                 }
+                .labelsHidden()
             }
 
             Section("Pauses") {

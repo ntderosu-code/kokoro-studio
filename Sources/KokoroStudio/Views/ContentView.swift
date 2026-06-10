@@ -49,14 +49,15 @@ struct ContentView: View {
             .animation(.spring(duration: 0.35),
                        value: state.lastAudio?.previewWAV)
         }
-        // The "desk" the page card and glass controls sit on.
-        .background(Color(nsColor: .underPageBackgroundColor),
-                    ignoresSafeAreaEdges: .all)
+        // The "desk" the page card and glass controls sit on. Standard window
+        // background — lighter than underPageBackground, and the titlebar
+        // keeps its system material.
+        .background(Color(nsColor: .windowBackgroundColor),
+                    ignoresSafeAreaEdges: .bottom)
         .inspector(isPresented: $sidebarVisible) {
             SidebarView()
                 .inspectorColumnWidth(min: 240, ideal: 290, max: 360)
         }
-        .toolbarBackground(.hidden, for: .windowToolbar)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Menu {
