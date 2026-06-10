@@ -1,0 +1,4 @@
+module CSherpaOnnx {
+    header "shim.h"
+    export *
+}
