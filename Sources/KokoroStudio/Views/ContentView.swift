@@ -27,31 +27,30 @@ struct ContentView: View {
 
     var body: some View {
         EditorView()
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
+            .padding(14)
             .frame(minWidth: 380, maxWidth: .infinity,
                    minHeight: 200, maxHeight: .infinity)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-            BarGlassContainer(spacing: 10) {
-                VStack(spacing: 10) {
-                    if state.lastAudio != nil {
-                        PlayerBar(player: player,
-                                  onExport: { showingExportSheet = true })
+            // Glass floats over the page so the script scrolls beneath it —
+            // that's what gives Liquid Glass something to refract.
+            .overlay(alignment: .bottom) {
+                BarGlassContainer(spacing: 10) {
+                    VStack(spacing: 10) {
+                        if state.lastAudio != nil {
+                            PlayerBar(player: player,
+                                      onExport: { showingExportSheet = true })
+                                .barGlass()
+                        }
+                        actionBar
                             .barGlass()
                     }
-                    actionBar
-                        .barGlass()
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 28)
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
-                .padding(.top, 4)
+                .animation(.spring(duration: 0.35),
+                           value: state.lastAudio?.previewWAV)
             }
-            .animation(.spring(duration: 0.35),
-                       value: state.lastAudio?.previewWAV)
-        }
-        // The "desk" the page card and glass controls sit on — frosted
-        // window material so the glass actually has something to refract.
-        .deskBackground()
+        .background(Color(nsColor: .windowBackgroundColor),
+                    ignoresSafeAreaEdges: .bottom)
         .inspector(isPresented: $sidebarVisible) {
             SidebarView()
                 .inspectorColumnWidth(min: 240, ideal: 290, max: 360)
@@ -149,9 +148,18 @@ struct ContentView: View {
         }
     }
 
+    private var wordCount: Int {
+        state.script.split { $0.isWhitespace || $0.isNewline }.count
+    }
+
     private var actionBar: some View {
         HStack(spacing: 12) {
             statusView
+            if !state.isGenerating {
+                Text("\(wordCount) words · \(state.script.count) characters")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
             if state.isGenerating {
                 Button("Stop") {
@@ -201,36 +209,23 @@ struct ContentView: View {
 struct EditorView: View {
     @EnvironmentObject private var state: AppState
 
-    private var wordCount: Int {
-        state.script.split { $0.isWhitespace || $0.isNewline }.count
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: $state.script)
-                    .font(.system(size: 14))
-                    .lineSpacing(4)
-                    .scrollContentBackground(.hidden)
-                    .padding(8)
-                if state.script.isEmpty {
-                    Text("Type or paste your script here…")
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 14))
-                        .padding(.top, 16)
-                        .padding(.leading, 13)
-                        .allowsHitTesting(false)
-                }
-            }
-            Divider()
-            HStack {
-                Text("\(wordCount) words · \(state.script.count) characters")
-                    .font(.caption)
+        ZStack(alignment: .topLeading) {
+            TextEditor(text: $state.script)
+                .font(.system(size: 14))
+                .lineSpacing(4)
+                .scrollContentBackground(.hidden)
+                .padding(8)
+                // Keep the last lines reachable above the floating glass bars.
+                .contentMargins(.bottom, 120, for: .scrollContent)
+            if state.script.isEmpty {
+                Text("Type or paste your script here…")
                     .foregroundStyle(.secondary)
-                Spacer()
+                    .font(.system(size: 14))
+                    .padding(.top, 16)
+                    .padding(.leading, 13)
+                    .allowsHitTesting(false)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
         }
         .background(Color(nsColor: .textBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 12))
