@@ -2,6 +2,11 @@ import SwiftUI
 
 struct SidebarView: View {
     @EnvironmentObject private var state: AppState
+    @State private var showingDictionaryEditor = false
+
+    private func pauseLabel(_ ms: Int) -> String {
+        ms == 0 ? "Model default" : "\(ms) ms"
+    }
 
     private var outputFolderName: String {
         state.outputFolderPath.isEmpty
@@ -62,6 +67,41 @@ struct SidebarView: View {
                 }
             }
 
+            Section("Pauses") {
+                LabeledContent("Paragraph") {
+                    Text(pauseLabel(state.paragraphPauseMs))
+                        .monospacedDigit().foregroundStyle(.secondary)
+                }
+                Slider(value: Binding(get: { Double(state.paragraphPauseMs) },
+                                      set: { state.paragraphPauseMs = Int($0) }),
+                       in: 0...1500, step: 50) {
+                    Text("Paragraph pause")
+                }
+                .help("Extra silence between paragraphs (blank or new lines)")
+
+                LabeledContent("Punctuation") {
+                    Text(pauseLabel(state.punctuationPauseMs))
+                        .monospacedDigit().foregroundStyle(.secondary)
+                }
+                Slider(value: Binding(get: { Double(state.punctuationPauseMs) },
+                                      set: { state.punctuationPauseMs = Int($0) }),
+                       in: 0...800, step: 25) {
+                    Text("Punctuation pause")
+                }
+                .help("Extra silence after . ! ? ; : , — 0 keeps the voice's natural rhythm")
+            }
+
+            Section("Pronunciation") {
+                Button("Edit Dictionary…") {
+                    showingDictionaryEditor = true
+                }
+                let ruleCount = PronunciationDictionary.parse(state.pronunciationRulesText).count
+                if ruleCount > 0 {
+                    Text("\(ruleCount) rule\(ruleCount == 1 ? "" : "s") active")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
             Section("Made with") {
                 Link("Kokoro model — hexgrad (Apache-2.0)",
                      destination: URL(string: "https://huggingface.co/hexgrad/Kokoro-82M")!)
@@ -75,5 +115,50 @@ struct SidebarView: View {
             .font(.caption)
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $showingDictionaryEditor) {
+            DictionaryEditorView(rulesText: $state.pronunciationRulesText)
+        }
+    }
+}
+
+/// Fixed header, scrollable editor body, fixed footer.
+struct DictionaryEditorView: View {
+    @Binding var rulesText: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Pronunciation Dictionary")
+                    .font(.headline)
+                Text("One rule per line: word = how it should sound. " +
+                     "Applied to whole words, ignoring case, before synthesis. " +
+                     "Lines starting with # are comments.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Example:  kokoro = koh koh roh")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+
+            Divider()
+
+            TextEditor(text: $rulesText)
+                .font(.body.monospaced())
+                .frame(minHeight: 220)
+                .padding(8)
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+        .frame(width: 440, height: 400)
     }
 }

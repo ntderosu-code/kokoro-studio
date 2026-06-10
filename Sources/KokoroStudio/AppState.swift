@@ -43,6 +43,9 @@ final class AppState: ObservableObject {
     @AppStorage("speed") var speed = 1.0
     @AppStorage("exportFormat") private var exportFormatRaw = ExportFormat.wav.rawValue
     @AppStorage("outputFolderPath") var outputFolderPath = ""
+    @AppStorage("paragraphPauseMs") var paragraphPauseMs = 500
+    @AppStorage("punctuationPauseMs") var punctuationPauseMs = 0
+    @AppStorage("pronunciationRules") var pronunciationRulesText = ""
 
     var exportFormat: ExportFormat {
         get { ExportFormat(rawValue: exportFormatRaw) ?? .wav }
@@ -111,20 +114,36 @@ final class AppState: ObservableObject {
         currentCancellation = flag
         phase = .generating(0)
 
-        let text = script
+        let rules = PronunciationDictionary.parse(pronunciationRulesText)
+        let processedScript = PronunciationDictionary.apply(rules, to: script)
+        let segments = ScriptSegmenter.segment(processedScript,
+                                               paragraphPauseMs: paragraphPauseMs,
+                                               punctuationPauseMs: punctuationPauseMs)
         let voice = voiceID
         let speedValue = Float(speed)
 
         Task.detached(priority: .userInitiated) {
-            let samples = engine.synthesize(text: text, voiceID: voice,
-                                            speed: speedValue) { progress in
-                Task { @MainActor in
-                    if case .generating = self.phase {
-                        self.phase = .generating(progress)
+            var allSamples: [Float] = []
+            let segmentCount = max(segments.count, 1)
+            for (index, segment) in segments.enumerated() {
+                if flag.isCancelled { break }
+                let segmentSamples = engine.synthesize(
+                    text: segment.text, voiceID: voice, speed: speedValue) { progress in
+                    let overall = (Float(index) + progress) / Float(segmentCount)
+                    Task { @MainActor in
+                        if case .generating = self.phase {
+                            self.phase = .generating(overall)
+                        }
                     }
+                    return !flag.isCancelled
                 }
-                return !flag.isCancelled
+                allSamples.append(contentsOf: segmentSamples)
+                if segment.pauseAfterMs > 0, !flag.isCancelled {
+                    let silenceFrames = engine.sampleRate * segment.pauseAfterMs / 1000
+                    allSamples.append(contentsOf: [Float](repeating: 0, count: silenceFrames))
+                }
             }
+            let samples = allSamples
             await MainActor.run {
                 self.finishGeneration(samples: samples,
                                       sampleRate: engine.sampleRate,
