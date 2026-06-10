@@ -30,6 +30,7 @@ for dylib in vendor/sherpa-onnx/lib/*.dylib; do
   fi
 done
 cp -R vendor/model "$APP/Contents/Resources/model"
+cp -R vendor/pocket "$APP/Contents/Resources/pocket"
 cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # Rewrite any absolute/local dylib references to @rpath so the bundled

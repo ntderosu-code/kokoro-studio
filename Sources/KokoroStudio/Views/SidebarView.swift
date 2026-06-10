@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 struct SidebarView: View {
     @EnvironmentObject private var state: AppState
@@ -8,25 +10,78 @@ struct SidebarView: View {
         ms == 0 ? "Model default" : "\(ms) ms"
     }
 
+    private func chooseVoiceSample() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.audio]
+        panel.message = "Choose a short, clean voice recording (5–15s) to clone"
+        if panel.runModal() == .OK, let url = panel.url {
+            state.pocketVoicePath = url.path
+        }
+    }
+
     private var outputFolderName: String {
         state.outputFolderPath.isEmpty
             ? "Ask on export"
             : URL(fileURLWithPath: state.outputFolderPath).lastPathComponent
     }
 
+    private var pocketVoiceName: String {
+        guard let url = state.pocketVoiceURL else { return "None" }
+        return url.deletingPathExtension().lastPathComponent.capitalized
+    }
+
     var body: some View {
         Form {
+            Section("Engine") {
+                Picker("Engine", selection: Binding(
+                    get: { state.engineKind },
+                    set: { state.engineKind = $0 })) {
+                    ForEach(TTSEngineKind.allCases) { kind in
+                        Text(kind.label).tag(kind)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                if state.engineKind == .pocket {
+                    Text("Pocket TTS clones the voice from a short audio sample.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Voice") {
-                Picker("Voice", selection: $state.voiceID) {
-                    ForEach(VoiceCatalog.grouped, id: \.label) { group in
-                        Section(group.label) {
-                            ForEach(group.voices) { voice in
-                                Text(voice.name).tag(voice.id)
+                if state.engineKind == .kokoro {
+                    Picker("Voice", selection: $state.voiceID) {
+                        ForEach(VoiceCatalog.grouped, id: \.label) { group in
+                            Section(group.label) {
+                                ForEach(group.voices) { voice in
+                                    Text(voice.name).tag(voice.id)
+                                }
                             }
                         }
                     }
+                    .labelsHidden()
+                } else {
+                    LabeledContent("Sample") {
+                        Text(pocketVoiceName)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .foregroundStyle(.secondary)
+                            .help(state.pocketVoiceURL?.path ?? "")
+                    }
+                    Button("Choose Voice Sample…") {
+                        chooseVoiceSample()
+                    }
+                    Button("Use Built-in Voice (Bria)") {
+                        state.pocketVoicePath = ""
+                    }
+                    .disabled(state.pocketVoicePath.isEmpty)
+                    Text("5–15 seconds of clean speech works best.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .labelsHidden()
 
                 LabeledContent("Speed") {
                     Text(String(format: "%.2f×", state.speed))
@@ -105,6 +160,8 @@ struct SidebarView: View {
             Section("Made with") {
                 Link("Kokoro model — hexgrad (Apache-2.0)",
                      destination: URL(string: "https://huggingface.co/hexgrad/Kokoro-82M")!)
+                Link("Pocket TTS — Kyutai (CC-BY-4.0)",
+                     destination: URL(string: "https://github.com/kyutai-labs/pocket-tts")!)
                 Link("sherpa-onnx — k2-fsa (Apache-2.0)",
                      destination: URL(string: "https://github.com/k2-fsa/sherpa-onnx")!)
                 Link("ONNX Runtime — Microsoft (MIT)",

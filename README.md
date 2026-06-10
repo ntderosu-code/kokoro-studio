@@ -6,8 +6,10 @@ natively via [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx). No Python,
 no network, no install steps — one self-contained `.app`.
 
 - Script editor with word/character count
-- Settings sidebar: voice (all 53 Kokoro 1.0 voices), speed, output format,
-  output folder
+- Two engines: **Kokoro** (53 voices) and **Pocket TTS** (clone any voice
+  from a 5–15s audio sample)
+- Settings sidebar: engine, voice, speed, pause control
+  (paragraph/punctuation), pronunciation dictionary, output format and folder
 - In-app playback with scrubbing
 - Export to WAV (lossless) or M4A (AAC)
 - Keyboard shortcuts: ⌘↩ generate, ⌘P play/pause, ⌘S export
@@ -15,7 +17,7 @@ no network, no install steps — one self-contained `.app`.
 ## Requirements
 
 - macOS 14 (Sonoma) or later
-- ~500MB disk for the app (the Kokoro model is bundled inside)
+- ~750MB disk for the app (both models are bundled inside)
 
 ## Building from source
 
@@ -58,6 +60,9 @@ Kokoro Studio is a thin GUI over excellent open source work:
 - **[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)** by hexgrad — the
   TTS model itself (Apache-2.0). The bundled `kokoro-multi-lang-v1_0` ONNX
   conversion is published by the sherpa-onnx project.
+- **[Pocket TTS](https://github.com/kyutai-labs/pocket-tts)** by Kyutai — the
+  voice-cloning engine (model weights CC-BY-4.0; ONNX export by
+  [KevinAHM](https://huggingface.co/KevinAHM/pocket-tts-onnx)).
 - **[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)** by k2-fsa /
   next-gen Kaldi — the on-device inference runtime (Apache-2.0).
 - **[ONNX Runtime](https://github.com/microsoft/onnxruntime)** by Microsoft —

@@ -27,4 +27,14 @@ if [ ! -d "vendor/model" ]; then
   rm "vendor/${MODEL_ARCHIVE}"
 fi
 
-echo "Done. vendor/sherpa-onnx and vendor/model ready."
+POCKET_ARCHIVE="sherpa-onnx-pocket-tts-int8-2026-01-26.tar.bz2"
+if [ ! -d "vendor/pocket" ]; then
+  echo "Fetching Pocket TTS model (~100MB)..."
+  curl -L -o "vendor/${POCKET_ARCHIVE}" \
+    "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/${POCKET_ARCHIVE}"
+  tar xf "vendor/${POCKET_ARCHIVE}" -C vendor
+  mv vendor/sherpa-onnx-pocket-tts-int8-2026-01-26 vendor/pocket
+  rm "vendor/${POCKET_ARCHIVE}"
+fi
+
+echo "Done. vendor/sherpa-onnx, vendor/model, and vendor/pocket ready."
