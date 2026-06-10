@@ -39,11 +39,11 @@ struct PlayerBar: View {
             Button("Export", systemImage: "square.and.arrow.down") {
                 state.export()
             }
+            .secondaryActionButtonStyle()
             .keyboardShortcut("s", modifiers: .command)
             .help("Export as \(state.exportFormat.label) (⌘S)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.bar)
     }
 }

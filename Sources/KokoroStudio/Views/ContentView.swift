@@ -21,22 +21,31 @@ struct ContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HSplitView {
-                EditorView()
-                    .frame(minWidth: 380, maxWidth: .infinity,
-                           minHeight: 200, maxHeight: .infinity)
-                if sidebarVisible {
-                    SidebarView()
-                        .frame(minWidth: 230, idealWidth: 270, maxWidth: 340)
+        HSplitView {
+            EditorView()
+                .frame(minWidth: 380, maxWidth: .infinity,
+                       minHeight: 200, maxHeight: .infinity)
+            if sidebarVisible {
+                SidebarView()
+                    .frame(minWidth: 230, idealWidth: 270, maxWidth: 340)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            BarGlassContainer(spacing: 10) {
+                VStack(spacing: 10) {
+                    if state.lastAudio != nil {
+                        PlayerBar(player: player)
+                            .barGlass()
+                    }
+                    actionBar
+                        .barGlass()
                 }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+                .padding(.top, 4)
             }
-            Divider()
-            actionBar
-            if state.lastAudio != nil {
-                Divider()
-                PlayerBar(player: player)
-            }
+            .animation(.spring(duration: 0.35),
+                       value: state.lastAudio?.previewWAV)
         }
         .toolbar {
             ToolbarItemGroup {
@@ -83,6 +92,7 @@ struct ContentView: View {
                 Button("Stop", systemImage: "stop.fill") {
                     state.cancelGeneration()
                 }
+                .secondaryActionButtonStyle()
                 .controlSize(.large)
                 .help("Stop generation")
             } else {
@@ -94,7 +104,7 @@ struct ContentView: View {
                           systemImage: "waveform")
                         .frame(minWidth: 110)
                 }
-                .buttonStyle(.borderedProminent)
+                .prominentActionButtonStyle()
                 .controlSize(.large)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!state.canGenerate)
@@ -103,7 +113,6 @@ struct ContentView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.bar)
     }
 
     @ViewBuilder
