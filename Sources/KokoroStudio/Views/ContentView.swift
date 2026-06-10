@@ -217,25 +217,25 @@ struct EditorView: View {
     @EnvironmentObject private var state: AppState
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            TextEditor(text: $state.script)
-                .font(.system(size: 14))
-                .lineSpacing(4)
-                .scrollContentBackground(.hidden)
-                .padding(8)
-                // Keep the last lines reachable above the floating glass bars.
-                .contentMargins(.bottom, 120, for: .scrollContent)
-            if state.script.isEmpty {
-                // Aligned to the text origin: 8 outer padding + NSTextView's
-                // 5pt container inset / line fragment padding.
-                Text("Type or paste your script here…")
-                    .foregroundStyle(.secondary)
-                    .font(.system(size: 14))
-                    .padding(.top, 13)
-                    .padding(.leading, 13)
-                    .allowsHitTesting(false)
+        TextEditor(text: $state.script)
+            .font(.system(size: 14))
+            .lineSpacing(4)
+            .scrollContentBackground(.hidden)
+            // Overlay on the TextEditor itself so the placeholder shares its
+            // coordinate space: 5pt = NSTextView's line fragment padding,
+            // which is exactly where the caret sits.
+            .overlay(alignment: .topLeading) {
+                if state.script.isEmpty {
+                    Text("Type or paste your script here…")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14))
+                        .padding(.leading, 5)
+                        .allowsHitTesting(false)
+                }
             }
-        }
+            .padding(8)
+            // Keep the last lines reachable above the floating glass bars.
+            .contentMargins(.bottom, 120, for: .scrollContent)
         .background(Color(nsColor: .textBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(

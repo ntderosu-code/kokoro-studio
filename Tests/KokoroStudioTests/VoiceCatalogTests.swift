@@ -31,7 +31,9 @@ final class VoiceCatalogTests: XCTestCase {
     }
 
     func testDisplayNameFormatting() {
-        XCTAssertEqual(VoiceCatalog.all[3].displayName, "★ af_heart — warm, expressive")
-        XCTAssertEqual(VoiceCatalog.all[30].displayName, "ff_siwis")
+        XCTAssertEqual(VoiceCatalog.all[3].displayName, "★ Heart — warm, expressive")
+        XCTAssertEqual(VoiceCatalog.all[13].displayName, "Eric — plain, conversational")
+        XCTAssertEqual(VoiceCatalog.all[30].displayName, "Siwis (French)")
+        XCTAssertEqual(VoiceCatalog.all[28].displayName, "Dora (Spanish)")
     }
 }

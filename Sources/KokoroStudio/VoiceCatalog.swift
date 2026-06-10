@@ -13,9 +13,30 @@ struct Voice: Identifiable, Hashable {
         self.recommended = recommended
     }
 
-    /// Picker row label, e.g. "★ af_heart — warm, expressive".
+    /// "af_heart" -> "Heart"; "zf_xiaoxiao" -> "Xiaoxiao".
+    var humanName: String {
+        name.split(separator: "_").dropFirst().joined(separator: " ").capitalized
+    }
+
+    /// Language tag for non-English voices — names repeat across languages
+    /// (Dora, Alex, Santa), and the collapsed picker loses its section.
+    var languageLabel: String? {
+        switch name.prefix(2) {
+        case "ef", "em": return "Spanish"
+        case "ff": return "French"
+        case "hf", "hm": return "Hindi"
+        case "if", "im": return "Italian"
+        case "jf", "jm": return "Japanese"
+        case "pf", "pm": return "Portuguese"
+        case "zf", "zm": return "Chinese"
+        default: return nil // English voices carry no tag
+        }
+    }
+
+    /// Picker row label, e.g. "★ Heart — warm, expressive" or "Dora (Spanish)".
     var displayName: String {
-        var label = recommended ? "★ \(name)" : name
+        var label = recommended ? "★ \(humanName)" : humanName
+        if let languageLabel { label += " (\(languageLabel))" }
         if let tagline { label += " — \(tagline)" }
         return label
     }

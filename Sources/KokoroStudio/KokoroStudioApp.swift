@@ -12,5 +12,14 @@ struct KokoroStudioApp: App {
                 .task { state.loadModel() }
         }
         .defaultSize(width: 940, height: 620)
+        .commands {
+            // Replace the default (empty) help viewer with something useful.
+            CommandGroup(replacing: .help) {
+                Link("Kokoro Studio Help",
+                     destination: URL(string: "https://github.com/ntderosu-code/kokoro-studio#readme")!)
+                Link("Report an Issue…",
+                     destination: URL(string: "https://github.com/ntderosu-code/kokoro-studio/issues")!)
+            }
+        }
     }
 }
