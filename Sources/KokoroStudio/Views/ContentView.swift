@@ -49,11 +49,9 @@ struct ContentView: View {
             .animation(.spring(duration: 0.35),
                        value: state.lastAudio?.previewWAV)
         }
-        // The "desk" the page card and glass controls sit on. Standard window
-        // background — lighter than underPageBackground, and the titlebar
-        // keeps its system material.
-        .background(Color(nsColor: .windowBackgroundColor),
-                    ignoresSafeAreaEdges: .bottom)
+        // The "desk" the page card and glass controls sit on — frosted
+        // window material so the glass actually has something to refract.
+        .deskBackground()
         .inspector(isPresented: $sidebarVisible) {
             SidebarView()
                 .inspectorColumnWidth(min: 240, ideal: 290, max: 360)

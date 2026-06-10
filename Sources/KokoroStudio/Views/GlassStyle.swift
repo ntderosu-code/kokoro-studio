@@ -5,6 +5,18 @@ import SwiftUI
 // bar) per HIG — content surfaces and the settings form stay standard.
 
 extension View {
+    /// Frosted window backdrop: the whole window becomes translucent material
+    /// so the desktop glows through — the "desk" the page card sits on.
+    @ViewBuilder
+    func deskBackground() -> some View {
+        if #available(macOS 15.0, *) {
+            self.containerBackground(.thinMaterial, for: .window)
+        } else {
+            self.background(Color(nsColor: .windowBackgroundColor),
+                            ignoresSafeAreaEdges: .bottom)
+        }
+    }
+
     /// Floating-bar chrome: Liquid Glass on macOS 26+, material card below.
     @ViewBuilder
     func barGlass(cornerRadius: CGFloat = 14) -> some View {
