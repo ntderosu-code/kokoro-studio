@@ -59,8 +59,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Kokoro Studio</string>
   <key>CFBundleDisplayName</key><string>Kokoro Studio</string>
   <key>CFBundleIdentifier</key><string>com.byron.KokoroStudio</string>
-  <key>CFBundleVersion</key><string>1.0</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleVersion</key><string>1.1</string>
+  <key>CFBundleShortVersionString</key><string>1.1</string>
   <key>CFBundleExecutable</key><string>Kokoro Studio</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
