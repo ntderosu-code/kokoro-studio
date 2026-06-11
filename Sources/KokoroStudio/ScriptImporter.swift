@@ -62,4 +62,93 @@ enum ScriptImporter {
             .replacing(#/\n{3,}/#, with: "\n\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    /// Word/RTF conversion. Headings aren't exposed as named styles by
+    /// NSAttributedString, so a paragraph noticeably larger than the
+    /// document's body size is treated as a heading. Bold runs inside
+    /// normal paragraphs become *emphasis*.
+    static func convertAttributed(_ attributed: NSAttributedString) -> String {
+        let full = attributed.string as NSString
+        var paragraphRanges: [NSRange] = []
+        full.enumerateSubstrings(in: NSRange(location: 0, length: full.length),
+                                 options: [.byParagraphs, .substringNotRequired]) {
+            _, range, _, _ in
+            paragraphRanges.append(range)
+        }
+
+        func dominantSize(_ range: NSRange) -> CGFloat {
+            var weighted: [CGFloat: Int] = [:]
+            attributed.enumerateAttribute(.font, in: range) { value, runRange, _ in
+                let size = (value as? NSFont)?.pointSize ?? 12
+                weighted[size, default: 0] += runRange.length
+            }
+            return weighted.max { $0.value < $1.value }?.key ?? 12
+        }
+
+        let sizes = paragraphRanges.map(dominantSize)
+        // Body size = the most common paragraph size across the document.
+        var sizeCounts: [CGFloat: Int] = [:]
+        for size in sizes { sizeCounts[size, default: 0] += 1 }
+        let bodySize = sizeCounts.max { $0.value < $1.value }?.key ?? 12
+
+        var lines: [String] = []
+        for (index, range) in paragraphRanges.enumerated() {
+            let plain = normalizePlainText(full.substring(with: range))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if plain.isEmpty { lines.append(""); continue }
+            if sizes[index] >= bodySize * 1.15 {
+                lines.append("# " + plain)
+                continue
+            }
+            var line = ""
+            attributed.enumerateAttribute(.font, in: range) { value, runRange, _ in
+                let runText = normalizePlainText(full.substring(with: runRange))
+                let isBold = (value as? NSFont)?.fontDescriptor.symbolicTraits
+                    .contains(.bold) ?? false
+                let trimmed = runText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if isBold, !trimmed.isEmpty {
+                    line += runText.replacingOccurrences(of: trimmed,
+                                                         with: "*\(trimmed)*")
+                } else {
+                    line += runText
+                }
+            }
+            lines.append(line.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return lines.joined(separator: "\n")
+            .replacing(#/\n{3,}/#, with: "\n\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func importFile(at url: URL) throws -> String {
+        switch url.pathExtension.lowercased() {
+        case "md", "markdown":
+            return convertMarkdown(try String(contentsOf: url, encoding: .utf8))
+        case "rtf":
+            let attributed = try NSAttributedString(
+                url: url,
+                options: [.documentType: NSAttributedString.DocumentType.rtf],
+                documentAttributes: nil)
+            return convertAttributed(attributed)
+        case "docx":
+            let attributed = try NSAttributedString(
+                url: url,
+                options: [.documentType: NSAttributedString.DocumentType.officeOpenXML],
+                documentAttributes: nil)
+            return convertAttributed(attributed)
+        default:
+            return normalizePlainText(try String(contentsOf: url, encoding: .utf8))
+        }
+    }
+
+    static let importableExtensions: Set<String> = ["md", "markdown", "txt",
+                                                    "text", "rtf", "docx"]
+
+    static var importableTypes: [UTType] {
+        var types: [UTType] = [.plainText, .rtf]
+        for ext in ["md", "docx"] {
+            if let type = UTType(filenameExtension: ext) { types.append(type) }
+        }
+        return types
+    }
 }
