@@ -8,6 +8,18 @@ struct SidebarView: View {
     @State private var showingDictionaryEditor = false
     @State private var showingCredits = false
     @State private var showingSpeakers = false
+    @State private var scriptSearch = ""
+    @State private var renameTarget: ScriptDocumentMeta?
+    @State private var renameText = ""
+    @State private var deleteTarget: ScriptDocumentMeta?
+
+    private var filteredDocuments: [ScriptDocumentMeta] {
+        guard !scriptSearch.trimmingCharacters(in: .whitespaces).isEmpty
+        else { return state.documents }
+        return state.documents.filter {
+            $0.title.localizedCaseInsensitiveContains(scriptSearch)
+        }
+    }
 
     private func pauseLabel(_ ms: Int) -> String {
         ms == 0 ? "Model default" : "\(ms) ms"
@@ -47,6 +59,46 @@ struct SidebarView: View {
 
     var body: some View {
         Form {
+            Section("Scripts") {
+                if state.documents.count > 5 {
+                    TextField("Search scripts", text: $scriptSearch)
+                        .textFieldStyle(.roundedBorder)
+                        .controlSize(.small)
+                }
+                ForEach(filteredDocuments) { doc in
+                    HStack {
+                        Image(systemName: doc.id == state.currentDocumentID
+                              ? "doc.text.fill" : "doc.text")
+                            .foregroundStyle(doc.id == state.currentDocumentID
+                                             ? Color.accentColor : .secondary)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(doc.title).lineLimit(1)
+                            if let profileName = doc.profileName {
+                                Text(profileName)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { state.selectDocument(doc.id) }
+                    .contextMenu {
+                        Button("Rename…") { renameTarget = doc }
+                        Button("Duplicate") { state.duplicateDocument(doc.id) }
+                        Divider()
+                        Button("Delete", role: .destructive) { deleteTarget = doc }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(doc.id == state.currentDocumentID
+                                            ? [.isSelected] : [])
+                }
+                Button("New Script", systemImage: "plus") {
+                    state.createDocument()
+                }
+                .help("Add a new empty script to the library")
+            }
+
             Section("Engine") {
                 Picker("Engine", selection: Binding(
                     get: { state.engineKind },
@@ -207,6 +259,32 @@ struct SidebarView: View {
         }
         .sheet(isPresented: $showingSpeakers) {
             SpeakersEditorView()
+        }
+        .alert("Rename Script",
+               isPresented: Binding(get: { renameTarget != nil },
+                                    set: { if !$0 { renameTarget = nil } })) {
+            TextField("Title", text: $renameText)
+            Button("Rename") {
+                if let target = renameTarget {
+                    state.renameDocument(target.id, to: renameText)
+                }
+                renameTarget = nil
+            }
+            Button("Cancel", role: .cancel) { renameTarget = nil }
+        }
+        .onChange(of: renameTarget) { _, target in
+            if let target { renameText = target.title }
+        }
+        .alert("Delete \"\(deleteTarget?.title ?? "")\"?",
+               isPresented: Binding(get: { deleteTarget != nil },
+                                    set: { if !$0 { deleteTarget = nil } })) {
+            Button("Delete", role: .destructive) {
+                if let target = deleteTarget { state.deleteDocument(target.id) }
+                deleteTarget = nil
+            }
+            Button("Cancel", role: .cancel) { deleteTarget = nil }
+        } message: {
+            Text("Removes the script from the library. Exported audio files are not affected.")
         }
     }
 }
