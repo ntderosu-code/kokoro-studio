@@ -72,8 +72,12 @@ struct ContentView: View {
                                           })
                                     .barGlass()
                             }
-                            actionBar
-                                .barGlass()
+                            // Only present while it has content: the first
+                            // Generate, or status/Stop during generation.
+                            if state.lastAudio == nil || state.isGenerating {
+                                actionBar
+                                    .barGlass()
+                            }
                         }
                         .padding(.horizontal, 28)
                         .padding(.bottom, 16)
