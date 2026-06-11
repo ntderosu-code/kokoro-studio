@@ -537,6 +537,38 @@ final class AppState: ObservableObject {
         auditionPlaying = nil
     }
 
+    // MARK: - macOS Services (#38)
+
+    /// Text waiting for the engine when a service fires before the model
+    /// finished loading (services can launch the app cold).
+    private var pendingServiceSpeakText: String?
+
+    func handleSpeakService(text: String) {
+        let cleaned = ScriptImporter.normalizePlainText(text)
+        guard phase == .ready else {
+            pendingServiceSpeakText = cleaned
+            return
+        }
+        // The audition path already renders one-off text with the current
+        // voice and plays it without touching the editor.
+        let voice: AuditionVoice = engineKind == .pocket
+            ? .pocket : .kokoro(voiceID)
+        toggleAudition(text: String(cleaned.prefix(2000)), voice: voice)
+    }
+
+    func handleNewScriptService(text: String) {
+        createDocument(text: ScriptImporter.normalizePlainText(text))
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Call when phase flips to .ready (model loaded).
+    func flushPendingServiceText() {
+        if let pending = pendingServiceSpeakText {
+            pendingServiceSpeakText = nil
+            handleSpeakService(text: pending)
+        }
+    }
+
     // MARK: - Sample script (#31)
 
     @AppStorage("hasSeededSampleScript") private var hasSeededSampleScript = false
@@ -625,6 +657,7 @@ final class AppState: ObservableObject {
                 await MainActor.run {
                     self.engine = engine
                     self.phase = .ready
+                    self.flushPendingServiceText()
                 }
             } catch {
                 await MainActor.run {

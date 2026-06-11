@@ -34,6 +34,9 @@ struct KokoroStudioApp: App {
                     state.loadModel()
                     state.seedSampleScriptIfFirstRun()
                     state.loadLibrary()
+                    ServiceProvider.shared.state = state
+                    NSApp.servicesProvider = ServiceProvider.shared
+                    NSUpdateDynamicServices()
                 }
         }
         .defaultSize(width: 940, height: 620)
