@@ -23,6 +23,8 @@ unzip, drag to Applications, double-click. macOS 14+ (Apple Silicon & Intel).
 - **Pocket TTS engine** — clone any voice from a 5–15 second audio sample
 - Multi-speaker dialogue: tag lines `@Maya:` / `@Sam:` and map each speaker
   to a voice
+- **Compare Voices**: hear the same line in two voices side by side, then
+  adopt the winner with one click
 
 **Narration control** (built for instructional content)
 - Pause control by type: paragraph, sentence (`. ! ?`), clause (`, ; :`),
@@ -43,15 +45,33 @@ unzip, drag to Applications, double-click. macOS 14+ (Apple Silicon & Intel).
 - **Module splitting**: `## file: lesson-2` markers export one audio +
   caption file per section from a single document
 - Loudness normalization: silence trim, −1 dBFS leveling, anti-click fades
+- **Loudness presets**: −16 LUFS podcast, −14 LUFS streaming, or a custom
+  integrated-loudness target (BS.1770) at export
+- **Batch export**: queue several scripts and walk away — each renders
+  with its own profile, honors module splitting, and notifies when done
 - Lead-in/lead-out silence padding for LMS players that clip
 - Live estimated audio length that calibrates from your actual generations
 
 **Editor**
+- **Script library**: every lesson lives in the sidebar with autosave —
+  each script remembers its profile
+- **Document import** (⌘O or drag-and-drop): `.docx`, `.md`, `.txt`,
+  `.rtf` — headings and bold convert to script syntax, with a preview
+  before anything touches your editor
+- **Patch re-render** (⌥⌘↩): edit a sentence after generating and splice
+  just that re-rendered block into the existing audio and captions
+- **Follow-along highlight**: the spoken sentence lights up during
+  playback; click any sentence to jump the audio there
+- **Waveform scrubber** with heading tick marks in the player bar
+- Pronunciation dictionary **CSV import/export** for course teams
+- **macOS Services**: right-click selected text in any app to speak it or
+  start a new script from it
 - Find & replace (native find bar, ⌘F / ⌥⌘F)
 - Apple Intelligence **Writing Tools** in the toolbar (macOS 15.2+)
 - **Preview Selection** (⇧⌘↩): audition just the selected sentence
 - Quick-add to dictionary: select a word, press ⌘D
 - Script syntax cheat sheet (? in the toolbar)
+- First-run sample script: a spoken tour of every syntax feature
 - In-app playback with scrubbing
 
 ## Keyboard shortcuts
@@ -59,7 +79,10 @@ unzip, drag to Applications, double-click. macOS 14+ (Apple Silicon & Intel).
 | Action | Shortcut |
 |---|---|
 | Generate / Re-generate | ⌘↩ |
+| Patch re-render edited lines | ⌥⌘↩ |
+| Preview selection | ⇧⌘↩ |
 | Export | ⌘S |
+| Import document | ⌘O |
 | Play / Pause | ⌘P |
 | Add selection to dictionary | ⌘D |
 | Find / Find & Replace | ⌘F / ⌥⌘F |
