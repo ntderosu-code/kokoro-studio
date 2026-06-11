@@ -123,7 +123,7 @@ struct ContentView: View {
             }
 
             ToolbarItemGroup {
-                Button("Preview Selection", systemImage: "play.circle") {
+                Button("Preview Selection", systemImage: "waveform.and.magnifyingglass") {
                     if let selection = selectedEditorText() {
                         player.stop()
                         state.generate(textOverride: selection)
@@ -150,8 +150,10 @@ struct ContentView: View {
                     showingExportSheet = true
                 }
                 .keyboardShortcut("s", modifiers: .command)
-                .disabled(state.lastAudio == nil)
-                .help("Export audio and captions (⌘S)")
+                .disabled(state.lastAudio == nil || state.lastAudio?.isPreview == true)
+                .help(state.lastAudio?.isPreview == true
+                      ? "Previews can't be exported — Re-generate the full script first"
+                      : "Export audio and captions (⌘S)")
 
                 Button("Add to Dictionary", systemImage: "character.book.closed") {
                     if let selection = selectedEditorText() {
@@ -171,6 +173,11 @@ struct ContentView: View {
                 .popover(isPresented: $showingSyntaxHelp, arrowEdge: .bottom) {
                     SyntaxCheatSheet()
                 }
+
+                SettingsLink {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Preferences: voices, editor, playback, export (⌘,)")
             }
         }
         .sheet(isPresented: $showingExportSheet) {

@@ -13,6 +13,16 @@ struct PlayerBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            if state.lastAudio?.isPreview == true {
+                Text("PREVIEW")
+                    .font(.caption2.weight(.semibold))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(.orange.opacity(0.2), in: Capsule())
+                    .foregroundStyle(.orange)
+                    .help("This is the selected text only — Re-generate renders the full script")
+            }
+
             Button("Re-generate") {
                 onRegenerate()
             }
@@ -50,7 +60,10 @@ struct PlayerBar: View {
                 onExport()
             }
             .secondaryActionButtonStyle()
-            .help("Export audio and captions (⌘S)")
+            .disabled(state.lastAudio?.isPreview == true)
+            .help(state.lastAudio?.isPreview == true
+                  ? "Previews can't be exported — Re-generate the full script first"
+                  : "Export audio and captions (⌘S)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

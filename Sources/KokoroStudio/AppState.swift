@@ -39,6 +39,8 @@ final class AppState: ObservableObject {
         let sampleRate: Int
         let previewWAV: URL
         let cues: [CaptionCue]
+        /// True when this came from Preview Selection, not the full script.
+        let isPreview: Bool
     }
 
     @Published var script = ""
@@ -249,6 +251,7 @@ final class AppState: ObservableObject {
         phase = .generating(0)
 
         let kind = engineKind
+        let isPreview = textOverride != nil
         let rules = PronunciationDictionary.parse(pronunciationRulesText)
         // Inline {word|sounds-like} overrides first (author-explicit wins),
         // then the dictionary, then number normalization.
@@ -288,7 +291,8 @@ final class AppState: ObservableObject {
                                           sampleRate: plan.sampleRate,
                                           cancelled: flag.isCancelled,
                                           segmentResults: results,
-                                          speed: Double(speedValue))
+                                          speed: Double(speedValue),
+                                          isPreview: isPreview)
                 }
             } catch {
                 await MainActor.run {
@@ -514,7 +518,7 @@ final class AppState: ObservableObject {
     private func finishGeneration(samples rawSamples: [Float], sampleRate: Int,
                                   cancelled: Bool,
                                   segmentResults: [(text: String, sampleCount: Int, pauseAfterMs: Int)],
-                                  speed: Double) {
+                                  speed: Double, isPreview: Bool = false) {
         phase = .ready
         currentCancellation = nil
         guard !cancelled, !rawSamples.isEmpty else { return }
@@ -556,7 +560,8 @@ final class AppState: ObservableObject {
             try AudioExporter.write(samples: samples, sampleRate: sampleRate,
                                     to: url, format: .wav)
             lastAudio = GeneratedAudio(samples: samples, sampleRate: sampleRate,
-                                       previewWAV: url, cues: cues)
+                                       previewWAV: url, cues: cues,
+                                       isPreview: isPreview)
         } catch {
             errorMessage = "Could not prepare preview audio: \(error.localizedDescription)"
         }
