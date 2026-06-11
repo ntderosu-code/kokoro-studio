@@ -37,6 +37,21 @@ struct ContentView: View {
         return selection.isEmpty ? nil : selection
     }
 
+    private func importDocument(at url: URL) {
+        let secured = url.startAccessingSecurityScopedResource()
+        defer { if secured { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let converted = try ScriptImporter.importFile(at: url)
+            guard !converted.isEmpty else {
+                state.errorMessage = "Nothing readable found in that document."
+                return
+            }
+            state.importedText = converted
+        } catch {
+            state.errorMessage = "Could not import: \(error.localizedDescription)"
+        }
+    }
+
     private func showFindAndReplace() {
         guard let textView = EditorTextAccess.focusTextView(in: NSApp.keyWindow)
         else { return }
@@ -226,6 +241,25 @@ struct ContentView: View {
             get: { state.auditionText.map(AuditionTarget.init) },
             set: { state.auditionText = $0?.text })) { target in
             VoiceAuditionView(text: target.text)
+        }
+        .sheet(item: Binding(
+            get: { state.importedText.map(AuditionTarget.init) },
+            set: { state.importedText = $0?.text })) { target in
+            ImportPreviewView(text: target.text)
+        }
+        .fileImporter(isPresented: $state.showingImportPanel,
+                      allowedContentTypes: ScriptImporter.importableTypes) { result in
+            if case .success(let url) = result { importDocument(at: url) }
+        }
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            guard let provider = providers.first else { return false }
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url,
+                      ScriptImporter.importableExtensions
+                          .contains(url.pathExtension.lowercased()) else { return }
+                Task { @MainActor in importDocument(at: url) }
+            }
+            return true
         }
         .onReceive(NotificationCenter.default.publisher(
             for: NSTextView.didChangeSelectionNotification)) { _ in

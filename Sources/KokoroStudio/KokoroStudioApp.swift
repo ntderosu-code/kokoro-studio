@@ -41,6 +41,12 @@ struct KokoroStudioApp: App {
             // focused text view's native find bar.
             TextEditingCommands()
             HelpCommands(state: state)
+            CommandGroup(after: .newItem) {
+                Button("Import Document…") {
+                    state.showingImportPanel = true
+                }
+                .keyboardShortcut("o", modifiers: .command)
+            }
         }
 
         Window("Script Syntax", id: "syntax-reference") {

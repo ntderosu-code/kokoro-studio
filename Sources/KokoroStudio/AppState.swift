@@ -264,6 +264,13 @@ final class AppState: ObservableObject {
         player.play()
     }
 
+    // MARK: - Document import (#33)
+
+    /// Toggled by the File menu; ContentView owns the fileImporter.
+    @Published var showingImportPanel = false
+    /// Non-nil presents the import preview sheet with converted text.
+    @Published var importedText: String?
+
     // MARK: - A/B voice audition (#32)
 
     /// Non-nil presents the Compare Voices sheet with this text.
