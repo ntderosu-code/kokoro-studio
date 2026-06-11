@@ -264,6 +264,39 @@ final class AppState: ObservableObject {
         player.play()
     }
 
+    // MARK: - Sample script (#31)
+
+    @AppStorage("hasSeededSampleScript") private var hasSeededSampleScript = false
+
+    /// Pure guard so the seeding rule is testable: only an untouched app
+    /// (never seeded, empty editor) gets the sample.
+    nonisolated static func shouldSeedSample(hasSeeded: Bool,
+                                             script: String) -> Bool {
+        !hasSeeded
+            && script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    func seedSampleScriptIfFirstRun() {
+        let shouldSeed = Self.shouldSeedSample(hasSeeded: hasSeededSampleScript,
+                                               script: script)
+        hasSeededSampleScript = true
+        if shouldSeed { script = SampleScript.text }
+    }
+
+    /// Help-menu restore. Confirms first when it would replace user work.
+    func requestRestoreSampleScript() {
+        let current = script.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !current.isEmpty, current != SampleScript.text {
+            let alert = NSAlert()
+            alert.messageText = "Replace the current script?"
+            alert.informativeText = "The sample script will replace what's in the editor. This can't be undone."
+            alert.addButton(withTitle: "Replace")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        script = SampleScript.text
+    }
+
     // MARK: - Model loading
 
     nonisolated private static func locateResource(bundleName: String,
