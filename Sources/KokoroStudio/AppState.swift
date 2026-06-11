@@ -793,6 +793,135 @@ final class AppState: ObservableObject {
         return (allSamples, segmentResults)
     }
 
+    // MARK: - Patch re-render (#11)
+
+    /// True when the script has drifted from what the audio was made of
+    /// — the precondition for offering Patch.
+    var canPatch: Bool {
+        guard let audio = lastAudio, !audio.isPreview,
+              phase == .ready else { return false }
+        return audio.sourceScript != script
+    }
+
+    /// Re-renders only the edited block and splices it into the existing
+    /// audio and captions. Falls back to an explanatory error when the
+    /// edit is too large or the cut points can't be trusted.
+    func patchRegenerate() {
+        guard let audio = lastAudio, canPatch else { return }
+        let currentScript = script
+        guard let patchPlan = ScriptPatcher.plan(
+            oldScript: audio.sourceScript, newScript: currentScript,
+            cues: audio.cues, sampleRate: audio.sampleRate,
+            totalSamples: audio.samples.count,
+            pauses: pauseSettings) else {
+            errorMessage = "This edit is too large to patch — use Re-generate for the full script."
+            return
+        }
+
+        let flag = CancellationFlag()
+        currentCancellation = flag
+        phase = .generating(0)
+
+        let kind = engineKind
+        let rules = PronunciationDictionary.parse(pronunciationRulesText)
+        var processed = InlineOverrides.apply(to: patchPlan.replacementText)
+        processed = PronunciationDictionary.apply(rules, to: processed)
+        processed = NumberNormalizer.normalize(processed, preset: numberPreset)
+        let segments = ScriptSegmenter.segment(processed, pauses: pauseSettings,
+                                               sentenceSplit: captionFormat != .off)
+        let voice = voiceID
+        let speakerMap = speakerVoices
+        let speakerSpeedMap = speakerSpeeds
+        let speedValue = Float(speed)
+        let voiceReferenceURL = pocketVoiceURL
+        let kokoroEngine = engine
+        let cachedPocketEngine = pocketEngine
+        let normalize = normalizeLoudness
+
+        Task.detached(priority: .userInitiated) {
+            do {
+                let plan = try await self.makeSynthesisPlan(
+                    kind: kind, kokoroEngine: kokoroEngine,
+                    cachedPocketEngine: cachedPocketEngine,
+                    voiceReferenceURL: voiceReferenceURL, voice: voice,
+                    speakerMap: speakerMap, speakerSpeedMap: speakerSpeedMap,
+                    speedValue: speedValue)
+                let (rawChunk, results) = AppState.runSegments(
+                    segments, plan: plan, flag: flag) { overall in
+                    Task { @MainActor in
+                        if case .generating = self.phase {
+                            self.phase = .generating(overall)
+                        }
+                    }
+                }
+                await MainActor.run {
+                    self.finishPatch(audio: audio, patchPlan: patchPlan,
+                                     rawChunk: rawChunk, results: results,
+                                     normalize: normalize,
+                                     sourceScript: currentScript,
+                                     cancelled: flag.isCancelled)
+                }
+            } catch {
+                await MainActor.run {
+                    self.phase = .ready
+                    self.currentCancellation = nil
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func finishPatch(audio: GeneratedAudio, patchPlan: PatchPlan,
+                             rawChunk: [Float],
+                             results: [(text: String, sampleCount: Int, pauseAfterMs: Int)],
+                             normalize: Bool, sourceScript: String,
+                             cancelled: Bool) {
+        phase = .ready
+        currentCancellation = nil
+        guard !cancelled else { return }
+
+        // Match the chunk to the file's -1 dBFS target; no trim or fades
+        // mid-file. An empty chunk is a pure deletion.
+        var chunk = rawChunk
+        if normalize, !chunk.isEmpty {
+            chunk = AudioProcessing.normalizePeak(chunk)
+        }
+        if patchPlan.trailingPauseMs > 0, !chunk.isEmpty {
+            chunk += [Float](repeating: 0,
+                             count: audio.sampleRate * patchPlan.trailingPauseMs / 1000)
+        }
+
+        let spliced = ScriptPatcher.splice(old: audio.samples,
+                                           cut: patchPlan.cutSampleRange,
+                                           replacement: chunk)
+        let newCues = CaptionWriter.buildCues(segments: results,
+                                              sampleRate: audio.sampleRate)
+        let insertAt = Double(patchPlan.cutSampleRange.lowerBound)
+            / Double(audio.sampleRate)
+        let timeDelta = Double(chunk.count - patchPlan.cutSampleRange.count)
+            / Double(audio.sampleRate)
+        let cues = ScriptPatcher.rebuildCues(
+            old: audio.cues, replacedRange: patchPlan.replacedCueRange,
+            newCues: newCues, insertAt: insertAt, timeDelta: timeDelta,
+            totalDuration: Double(spliced.count) / Double(audio.sampleRate))
+
+        do {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("kokoro-preview-\(UUID().uuidString)")
+                .appendingPathExtension("wav")
+            try AudioExporter.write(samples: spliced,
+                                    sampleRate: audio.sampleRate,
+                                    to: url, format: .wav)
+            lastAudio = GeneratedAudio(samples: spliced,
+                                       sampleRate: audio.sampleRate,
+                                       previewWAV: url, cues: cues,
+                                       isPreview: false,
+                                       sourceScript: sourceScript)
+        } catch {
+            errorMessage = "Could not prepare patched audio: \(error.localizedDescription)"
+        }
+    }
+
     /// Splits the script at `## file:` markers and exports each module as
     /// its own audio (+ captions) file into the chosen folder.
     func exportModules() {

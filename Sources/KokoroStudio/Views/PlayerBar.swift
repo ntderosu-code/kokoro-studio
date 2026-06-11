@@ -45,6 +45,16 @@ struct PlayerBar: View {
             .disabled(state.phase != .ready || !state.canGenerate)
             .help("Generate speech again (⌘↩)")
 
+            if state.canPatch {
+                Button("Patch") {
+                    player.stop()
+                    state.patchRegenerate()
+                }
+                .secondaryActionButtonStyle()
+                .keyboardShortcut(.return, modifiers: [.command, .option])
+                .help("Re-render only the edited lines and splice them into the existing audio (⌥⌘↩)")
+            }
+
             Button {
                 player.togglePlayPause()
             } label: {
