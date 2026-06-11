@@ -1,5 +1,10 @@
 import SwiftUI
 
+struct AuditionTarget: Identifiable {
+    let text: String
+    var id: String { text }
+}
+
 struct ContentView: View {
     @EnvironmentObject private var state: AppState
     @StateObject private var player = PlayerController()
@@ -152,6 +157,19 @@ struct ContentView: View {
                     .help(hasEditorSelection
                           ? "Add selected word to pronunciation dictionary (⌘D)"
                           : "Select a word to add it to the dictionary (⌘D)")
+
+                    Button("Compare Voices", systemImage: "person.2.wave.2") {
+                        let text = selectedEditorText()
+                            ?? AuditionSupport.defaultText(from: state.script)
+                        guard !text.isEmpty else { return }
+                        player.stop()
+                        state.auditionText = text
+                    }
+                    .disabled(state.phase != .ready
+                              || (state.script.trimmingCharacters(
+                                    in: .whitespacesAndNewlines).isEmpty
+                                  && !hasEditorSelection))
+                    .help("Hear the selection (or first sentence) in two voices side by side")
                 }
             }
 
@@ -203,6 +221,11 @@ struct ContentView: View {
             set: { quickAddWord = $0?.word })) { target in
             QuickAddDictionaryView(word: target.word,
                                    rulesText: $state.pronunciationRulesText)
+        }
+        .sheet(item: Binding(
+            get: { state.auditionText.map(AuditionTarget.init) },
+            set: { state.auditionText = $0?.text })) { target in
+            VoiceAuditionView(text: target.text)
         }
         .onReceive(NotificationCenter.default.publisher(
             for: NSTextView.didChangeSelectionNotification)) { _ in

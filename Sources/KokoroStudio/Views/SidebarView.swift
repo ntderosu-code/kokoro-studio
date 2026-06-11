@@ -116,6 +116,14 @@ struct SidebarView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Button("Compare Voices…") {
+                    state.auditionText
+                        = AuditionSupport.defaultText(from: state.script)
+                }
+                .disabled(state.phase != .ready
+                          || AuditionSupport.defaultText(from: state.script).isEmpty)
+                .help("Hear the script's first sentence in two voices side by side")
+
                 LabeledContent("Speed") {
                     Text(String(format: "%.2f×", state.speed))
                         .monospacedDigit()
