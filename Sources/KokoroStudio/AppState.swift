@@ -1,5 +1,16 @@
 import SwiftUI
 import AppKit
+import AVFoundation
+
+/// Clears preview state when a voice sample finishes playing.
+final class VoicePreviewDelegate: NSObject, AVAudioPlayerDelegate {
+    var onFinish: (() -> Void)?
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer,
+                                     successfully flag: Bool) {
+        Task { @MainActor in self.onFinish?() }
+    }
+}
 
 /// Cross-thread cancellation flag shared with the synthesis thread.
 final class CancellationFlag: @unchecked Sendable {
@@ -174,6 +185,74 @@ final class AppState: ObservableObject {
     var canGenerate: Bool {
         phase == .ready
             && !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    // MARK: - Voice previews
+
+    static let voicePreviewText = "This is the sound of my voice."
+
+    @Published var previewingVoiceID: Int?
+    @Published var renderingPreviewVoiceID: Int?
+    private let voicePreviewDelegate = VoicePreviewDelegate()
+    private var voicePreviewPlayer: AVAudioPlayer?
+
+    private static var voicePreviewDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory,
+                                 in: .userDomainMask)[0]
+            .appendingPathComponent("Kokoro Studio/VoicePreviews")
+    }
+
+    /// Plays a cached "This is the sound of my voice." sample for the voice,
+    /// rendering and caching it on first use. Toggles off if already playing.
+    func toggleVoicePreview(_ voiceID: Int) {
+        if previewingVoiceID == voiceID {
+            voicePreviewPlayer?.stop()
+            previewingVoiceID = nil
+            return
+        }
+        voicePreviewPlayer?.stop()
+        previewingVoiceID = nil
+
+        let cacheURL = Self.voicePreviewDirectory
+            .appendingPathComponent("v\(voiceID).wav")
+        if FileManager.default.fileExists(atPath: cacheURL.path) {
+            playPreview(from: cacheURL, voiceID: voiceID)
+            return
+        }
+        guard let engine, renderingPreviewVoiceID == nil, !isGenerating else { return }
+        renderingPreviewVoiceID = voiceID
+        Task.detached(priority: .userInitiated) {
+            let samples = engine.synthesize(text: AppState.voicePreviewText,
+                                            voiceID: voiceID, speed: 1.0,
+                                            progress: { _ in true })
+            await MainActor.run {
+                self.renderingPreviewVoiceID = nil
+                guard !samples.isEmpty else { return }
+                do {
+                    try FileManager.default.createDirectory(
+                        at: Self.voicePreviewDirectory,
+                        withIntermediateDirectories: true)
+                    try AudioExporter.write(
+                        samples: AudioProcessing.normalizePeak(samples),
+                        sampleRate: engine.sampleRate,
+                        to: cacheURL, format: .wav)
+                    self.playPreview(from: cacheURL, voiceID: voiceID)
+                } catch {
+                    self.errorMessage = "Could not render voice preview: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func playPreview(from url: URL, voiceID: Int) {
+        guard let player = try? AVAudioPlayer(contentsOf: url) else { return }
+        voicePreviewDelegate.onFinish = { [weak self] in
+            self?.previewingVoiceID = nil
+        }
+        player.delegate = voicePreviewDelegate
+        voicePreviewPlayer = player
+        previewingVoiceID = voiceID
+        player.play()
     }
 
     // MARK: - Model loading

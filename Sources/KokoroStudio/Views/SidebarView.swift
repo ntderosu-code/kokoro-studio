@@ -65,17 +65,21 @@ struct SidebarView: View {
 
             Section("Voice") {
                 if state.engineKind == .kokoro {
-                    Picker("Voice", selection: $state.voiceID) {
-                        ForEach(state.visibleVoiceGroups, id: \.label) { group in
-                            Section(group.label) {
-                                ForEach(group.voices) { voice in
-                                    Text(voice.displayName).tag(voice.id)
+                    HStack(spacing: 6) {
+                        Picker("Voice", selection: $state.voiceID) {
+                            ForEach(state.visibleVoiceGroups, id: \.label) { group in
+                                Section(group.label) {
+                                    ForEach(group.voices) { voice in
+                                        Text(voice.displayName).tag(voice.id)
+                                    }
                                 }
                             }
                         }
+                        .labelsHidden()
+                        .help("★ = recommended. Favorite or hide voices in Settings (⌘,)")
+
+                        VoicePreviewButton(voiceID: state.voiceID)
                     }
-                    .labelsHidden()
-                    .help("★ = recommended. Favorite or hide voices in Settings (⌘,)")
                     Button("Speakers…") {
                         showingSpeakers = true
                     }
@@ -184,6 +188,35 @@ struct SidebarView: View {
         .sheet(isPresented: $showingSpeakers) {
             SpeakersEditorView()
         }
+    }
+}
+
+/// Small play/stop button that auditions a voice with a cached
+/// "This is the sound of my voice." sample.
+struct VoicePreviewButton: View {
+    @EnvironmentObject private var state: AppState
+    let voiceID: Int
+
+    var body: some View {
+        Button {
+            state.toggleVoicePreview(voiceID)
+        } label: {
+            if state.renderingPreviewVoiceID == voiceID {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 16, height: 16)
+            } else {
+                Image(systemName: state.previewingVoiceID == voiceID
+                      ? "stop.circle.fill" : "play.circle")
+                    .foregroundStyle(state.previewingVoiceID == voiceID
+                                     ? .primary : .secondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(state.renderingPreviewVoiceID != nil
+                  && state.renderingPreviewVoiceID != voiceID)
+        .help("Hear this voice: “\(AppState.voicePreviewText)”")
+        .accessibilityLabel("Preview \(VoiceCatalog.voice(forID: voiceID).humanName)")
     }
 }
 

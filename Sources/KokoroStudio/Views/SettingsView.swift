@@ -76,6 +76,8 @@ struct VoicesSettingsTab: View {
                     Section(group.label) {
                         ForEach(group.voices) { voice in
                             HStack(spacing: 10) {
+                                VoicePreviewButton(voiceID: voice.id)
+
                                 Button {
                                     var favorites = state.favoriteVoiceIDs
                                     if favorites.contains(voice.id) {
