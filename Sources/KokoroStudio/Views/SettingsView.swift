@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// App preferences (⌘,): General behavior and the voice list manager.
 struct SettingsView: View {
@@ -100,10 +101,72 @@ struct DictionarySettingsTab: View {
 
             Divider()
 
-            Text("\(ruleCount) rule\(ruleCount == 1 ? "" : "s") active")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(8)
+            HStack {
+                Text("\(ruleCount) rule\(ruleCount == 1 ? "" : "s") active")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Import…") { importCSV() }
+                    .help("Merge rules from a CSV file (term,replacement,mode)")
+                Button("Export…") { exportCSV() }
+                    .help("Save all rules to a CSV file you can share")
+                    .disabled(ruleCount == 0)
+            }
+            .padding(8)
+        }
+    }
+
+    private func exportCSV() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText]
+        panel.nameFieldStringValue = "pronunciation-dictionary.csv"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try DictionaryCSV.export(rulesText: state.pronunciationRulesText)
+                .write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            state.errorMessage = "Could not export dictionary: \(error.localizedDescription)"
+        }
+    }
+
+    private func importCSV() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
+        guard panel.runModal() == .OK, let url = panel.url,
+              let csv = try? String(contentsOf: url, encoding: .utf8) else { return }
+        let imported = DictionaryCSV.parse(csv)
+        guard !imported.isEmpty else {
+            state.errorMessage = "No dictionary rules found in that file."
+            return
+        }
+        // Dry run finds conflicts before asking how to resolve them.
+        let dryRun = DictionaryCSV.merge(imported: imported,
+                                         into: state.pronunciationRulesText,
+                                         preferImported: false)
+        if dryRun.conflictTerms.isEmpty {
+            state.pronunciationRulesText = dryRun.mergedText
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = dryRun.conflictTerms.count == 1
+            ? "1 term already has a different rule"
+            : "\(dryRun.conflictTerms.count) terms already have different rules"
+        alert.informativeText = "Conflicting: "
+            + dryRun.conflictTerms.joined(separator: ", ")
+        alert.addButton(withTitle: "Keep Existing")
+        alert.addButton(withTitle: "Use Imported")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            state.pronunciationRulesText = dryRun.mergedText
+        case .alertSecondButtonReturn:
+            state.pronunciationRulesText = DictionaryCSV.merge(
+                imported: imported, into: state.pronunciationRulesText,
+                preferImported: true).mergedText
+        default:
+            break
         }
     }
 }
