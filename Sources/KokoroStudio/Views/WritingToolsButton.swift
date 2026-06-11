@@ -14,6 +14,22 @@ enum EditorTextAccess {
         return textView
     }
 
+    /// Find-only variant: never steals first responder. Searches the given
+    /// window first, then any window with an editable text view.
+    static func findTextView(in window: NSWindow?) -> NSTextView? {
+        if let window, let contentView = window.contentView,
+           let textView = find(in: contentView) {
+            return textView
+        }
+        for candidate in NSApp.windows {
+            if let contentView = candidate.contentView,
+               let textView = find(in: contentView) {
+                return textView
+            }
+        }
+        return nil
+    }
+
     private static func find(in view: NSView) -> NSTextView? {
         if let textView = view as? NSTextView, textView.isEditable {
             return textView

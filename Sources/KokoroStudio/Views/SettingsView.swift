@@ -41,6 +41,9 @@ struct GeneralSettingsTab: View {
             Section("Playback") {
                 Toggle("Play automatically after generating",
                        isOn: $state.autoplayAfterGenerate)
+                Toggle("Highlight sentence during playback",
+                       isOn: $state.followAlongHighlight)
+                    .help("Follows along in the editor while audio plays; click a sentence to jump there")
             }
 
             Section("Export") {

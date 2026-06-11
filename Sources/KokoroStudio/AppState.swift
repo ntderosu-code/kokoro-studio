@@ -138,6 +138,7 @@ final class AppState: ObservableObject {
     @AppStorage("editorFontSize") var editorFontSize = 14.0
     @AppStorage("settingsTab") var settingsTab = "general"
     @AppStorage("autoplayAfterGenerate") var autoplayAfterGenerate = false
+    @AppStorage("followAlongHighlight") var followAlongHighlight = true
     @AppStorage("revealInFinderAfterExport") var revealInFinderAfterExport = true
     @AppStorage("timestampInFilenames") var timestampInFilenames = true
     @AppStorage("favoriteVoiceIDs") private var favoriteVoiceIDsJSON = ""

@@ -8,6 +8,7 @@ struct AuditionTarget: Identifiable {
 struct ContentView: View {
     @EnvironmentObject private var state: AppState
     @StateObject private var player = PlayerController()
+    @StateObject private var highlighter = FollowAlongHighlighter()
     @State private var quickAddWord: String?
     @State private var showingLinter = false
     @State private var hasEditorSelection = false
@@ -265,14 +266,37 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(
             for: NSTextView.didChangeSelectionNotification)) { _ in
             hasEditorSelection = selectedEditorText() != nil
+            // Click-to-seek: only while playing, so ordinary caret
+            // placement during editing never jumps the audio.
+            if player.isPlaying, state.followAlongHighlight,
+               let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
+               textView.selectedRange().length == 0,
+               let target = highlighter.seekTarget(
+                   forCharacterAt: textView.selectedRange().location) {
+                player.seek(to: target)
+            }
         }
         .onChange(of: state.lastAudio?.previewWAV) { _, url in
+            highlighter.prepare(audio: state.lastAudio, script: state.script)
             if let url {
                 player.load(url: url)
                 if state.autoplayAfterGenerate {
                     player.togglePlayPause()
                 }
             }
+        }
+        .onChange(of: state.script) {
+            // Re-checks staleness; prepare bails fast on mismatch and
+            // clears any now-misaligned highlight.
+            highlighter.prepare(audio: state.lastAudio, script: state.script)
+        }
+        .onReceive(player.$currentTime) { time in
+            if state.followAlongHighlight, player.isPlaying {
+                highlighter.update(time: time)
+            }
+        }
+        .onChange(of: player.isPlaying) { _, playing in
+            if !playing { highlighter.clearHighlight() }
         }
         .alert("Something went wrong",
                isPresented: Binding(get: { state.errorMessage != nil },
