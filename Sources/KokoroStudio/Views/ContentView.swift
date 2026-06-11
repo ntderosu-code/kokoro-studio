@@ -4,7 +4,6 @@ struct ContentView: View {
     @EnvironmentObject private var state: AppState
     @StateObject private var player = PlayerController()
     @State private var quickAddWord: String?
-    @State private var showingSyntaxHelp = false
     @State private var showingLinter = false
     @State private var hasEditorSelection = false
 
@@ -93,8 +92,8 @@ struct ContentView: View {
             .padding(.bottom, 6)
             .frame(minWidth: 380, maxWidth: .infinity,
                    minHeight: 200, maxHeight: .infinity)
-        .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
+        .toolbar(id: "main") {
+            ToolbarItem(id: "profile", placement: .navigation) {
                 Menu {
                     Picker("Profile", selection: $selectedProfile) {
                         Text("Custom").tag("")
@@ -127,29 +126,52 @@ struct ContentView: View {
                 }
             }
 
-            ToolbarItemGroup {
-                Button("Preview Selection", systemImage: "waveform.and.magnifyingglass") {
-                    if let selection = selectedEditorText() {
-                        player.stop()
-                        state.generate(textOverride: selection)
+            // Selection actions
+            ToolbarItem(id: "selection") {
+                ControlGroup {
+                    Button("Preview Selection",
+                           systemImage: "waveform.and.magnifyingglass") {
+                        if let selection = selectedEditorText() {
+                            player.stop()
+                            state.generate(textOverride: selection)
+                        }
+                    }
+                    .keyboardShortcut(.return, modifiers: [.command, .shift])
+                    .disabled(state.phase != .ready || !hasEditorSelection)
+                    .help(hasEditorSelection
+                          ? "Generate only the selected text (⇧⌘↩)"
+                          : "Select part of the script to preview it (⇧⌘↩)")
+
+                    Button("Add to Dictionary", systemImage: "character.book.closed") {
+                        if let selection = selectedEditorText() {
+                            quickAddWord = selection
+                        }
+                    }
+                    .keyboardShortcut("d", modifiers: .command)
+                    .disabled(!hasEditorSelection)
+                    .help(hasEditorSelection
+                          ? "Add selected word to pronunciation dictionary (⌘D)"
+                          : "Select a word to add it to the dictionary (⌘D)")
+                }
+            }
+
+            // Text-editing tools
+            ToolbarItem(id: "editing") {
+                ControlGroup {
+                    Button("Find & Replace", systemImage: "magnifyingglass") {
+                        showFindAndReplace()
+                    }
+                    .help("Find and replace in the script (⌘F)")
+
+                    if #available(macOS 15.2, *) {
+                        WritingToolsToolbarButton()
+                            .help("Proofread or rewrite the selection with Apple Intelligence")
                     }
                 }
-                .keyboardShortcut(.return, modifiers: [.command, .shift])
-                .disabled(state.phase != .ready || !hasEditorSelection)
-                .help(hasEditorSelection
-                      ? "Generate only the selected text (⇧⌘↩)"
-                      : "Select part of the script to preview it (⇧⌘↩)")
+            }
 
-                Button("Find & Replace", systemImage: "magnifyingglass") {
-                    showFindAndReplace()
-                }
-                .help("Find and replace in the script (⌘F)")
-
-                if #available(macOS 15.2, *) {
-                    WritingToolsToolbarButton()
-                        .help("Proofread or rewrite the selection with Apple Intelligence")
-                }
-
+            // Output action anchors the trailing edge
+            ToolbarItem(id: "export") {
                 Button("Export", systemImage: "square.and.arrow.up") {
                     showingExportSheet = true
                 }
@@ -158,30 +180,6 @@ struct ContentView: View {
                 .help(state.lastAudio?.isPreview == true
                       ? "Previews can't be exported — Re-generate the full script first"
                       : "Export audio and captions (⌘S)")
-
-                Button("Add to Dictionary", systemImage: "character.book.closed") {
-                    if let selection = selectedEditorText() {
-                        quickAddWord = selection
-                    }
-                }
-                .keyboardShortcut("d", modifiers: .command)
-                .disabled(!hasEditorSelection)
-                .help(hasEditorSelection
-                      ? "Add selected word to pronunciation dictionary (⌘D)"
-                      : "Select a word to add it to the dictionary (⌘D)")
-
-                Button("Script Syntax", systemImage: "questionmark.circle") {
-                    showingSyntaxHelp = true
-                }
-                .help("Script syntax: pauses, speakers, headings, pronunciation")
-                .popover(isPresented: $showingSyntaxHelp, arrowEdge: .bottom) {
-                    SyntaxCheatSheet()
-                }
-
-                SettingsLink {
-                    Label("Settings", systemImage: "gearshape")
-                }
-                .help("Preferences: voices, editor, playback, export (⌘,)")
             }
         }
         .sheet(isPresented: $showingExportSheet) {

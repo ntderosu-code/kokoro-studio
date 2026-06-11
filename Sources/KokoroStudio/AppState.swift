@@ -123,6 +123,7 @@ final class AppState: ObservableObject {
     // MARK: Preferences (Settings window)
 
     @AppStorage("editorFontSize") var editorFontSize = 14.0
+    @AppStorage("settingsTab") var settingsTab = "general"
     @AppStorage("autoplayAfterGenerate") var autoplayAfterGenerate = false
     @AppStorage("revealInFinderAfterExport") var revealInFinderAfterExport = true
     @AppStorage("timestampInFilenames") var timestampInFilenames = true

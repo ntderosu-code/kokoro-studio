@@ -2,14 +2,20 @@ import SwiftUI
 
 /// App preferences (⌘,): General behavior and the voice list manager.
 struct SettingsView: View {
+    @EnvironmentObject private var state: AppState
+
     var body: some View {
-        TabView {
+        TabView(selection: Binding(get: { state.settingsTab },
+                                   set: { state.settingsTab = $0 })) {
             GeneralSettingsTab()
                 .tabItem { Label("General", systemImage: "gearshape") }
+                .tag("general")
             VoicesSettingsTab()
                 .tabItem { Label("Voices", systemImage: "person.wave.2") }
+                .tag("voices")
             DictionarySettingsTab()
                 .tabItem { Label("Dictionary", systemImage: "character.book.closed") }
+                .tag("dictionary")
         }
         .frame(width: 480, height: 420)
     }

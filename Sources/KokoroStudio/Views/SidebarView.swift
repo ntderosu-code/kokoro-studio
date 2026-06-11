@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct SidebarView: View {
     @EnvironmentObject private var state: AppState
+    @Environment(\.openSettings) private var openSettings
     @State private var showingDictionaryEditor = false
     @State private var showingCredits = false
     @State private var showingSpeakers = false
@@ -79,6 +80,17 @@ struct SidebarView: View {
                         .help("★ = recommended. Favorite or hide voices in Settings (⌘,)")
 
                         VoicePreviewButton(voiceID: state.voiceID)
+
+                        Button {
+                            state.settingsTab = "voices"
+                            openSettings()
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Manage voices: favorite the ones you use, hide the rest")
+                        .accessibilityLabel("Voice settings")
                     }
                     Button("Speakers…") {
                         showingSpeakers = true
