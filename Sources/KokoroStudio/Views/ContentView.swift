@@ -249,6 +249,9 @@ struct ContentView: View {
             set: { state.importedText = $0?.text })) { target in
             ImportPreviewView(text: target.text)
         }
+        .sheet(isPresented: $state.showingBatchSheet) {
+            BatchQueueView()
+        }
         .fileImporter(isPresented: $state.showingImportPanel,
                       allowedContentTypes: ScriptImporter.importableTypes) { result in
             if case .success(let url) = result { importDocument(at: url) }

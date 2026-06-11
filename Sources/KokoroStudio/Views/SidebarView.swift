@@ -97,6 +97,11 @@ struct SidebarView: View {
                     state.createDocument()
                 }
                 .help("Add a new empty script to the library")
+                Button("Batch Export…", systemImage: "square.stack.3d.up") {
+                    state.showingBatchSheet = true
+                }
+                .disabled(state.phase != .ready && !state.batchRunning)
+                .help("Render and export several scripts unattended")
             }
 
             Section("Engine") {
