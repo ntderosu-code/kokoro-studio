@@ -4,6 +4,7 @@ struct ContentView: View {
     @EnvironmentObject private var state: AppState
     @StateObject private var player = PlayerController()
     @State private var quickAddWord: String?
+    @State private var showingSyntaxHelp = false
     @State private var showingExportSheet = false
     @State private var showingSaveProfile = false
     @State private var newProfileName = ""
@@ -133,6 +134,14 @@ struct ContentView: View {
                 }
                 .keyboardShortcut("d", modifiers: .command)
                 .help("Add selected word to pronunciation dictionary (⌘D)")
+
+                Button("Script Syntax", systemImage: "questionmark.circle") {
+                    showingSyntaxHelp = true
+                }
+                .help("Script syntax: pauses, speakers, headings, pronunciation")
+                .popover(isPresented: $showingSyntaxHelp, arrowEdge: .bottom) {
+                    SyntaxCheatSheet()
+                }
             }
         }
         .sheet(isPresented: $showingExportSheet) {
@@ -196,6 +205,20 @@ struct ContentView: View {
                 .controlSize(.large)
                 .help("Stop generation")
             } else {
+                Button("Preview Selection") {
+                    if let selection = selectedEditorText() {
+                        player.stop()
+                        state.generate(textOverride: selection)
+                    } else {
+                        state.errorMessage =
+                            "Select part of the script first — Preview generates just the selection."
+                    }
+                }
+                .secondaryActionButtonStyle()
+                .keyboardShortcut(.return, modifiers: [.command, .shift])
+                .disabled(state.phase != .ready)
+                .help("Generate only the selected text (⇧⌘↩) — fast way to audition a sentence")
+
                 Button(state.lastAudio == nil ? "Generate" : "Re-generate") {
                     player.stop()
                     state.generate()

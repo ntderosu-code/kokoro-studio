@@ -45,6 +45,15 @@ enum AudioProcessing {
         return samples.map { $0 * gain }
     }
 
+    /// Lead-in/lead-out silence for players that clip the first moments.
+    static func pad(_ samples: [Float], sampleRate: Int,
+                    leadInMs: Int, leadOutMs: Int) -> [Float] {
+        guard leadInMs > 0 || leadOutMs > 0 else { return samples }
+        let leadIn = [Float](repeating: 0, count: max(0, sampleRate * leadInMs / 1000))
+        let leadOut = [Float](repeating: 0, count: max(0, sampleRate * leadOutMs / 1000))
+        return leadIn + samples + leadOut
+    }
+
     /// 10ms linear fade in/out to avoid clicks at clip boundaries.
     static func applyFades(_ samples: [Float], sampleRate: Int) -> [Float] {
         let fadeLength = min(sampleRate * 10 / 1000, samples.count / 2)

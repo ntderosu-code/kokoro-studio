@@ -87,6 +87,8 @@ final class AppState: ObservableObject {
     @AppStorage("normalizeLoudness") var normalizeLoudness = true
     @AppStorage("calibratedWordsPerSecond") var calibratedWordsPerSecond
         = DurationEstimator.defaultWordsPerSecond
+    @AppStorage("leadInMs") var leadInMs = 0
+    @AppStorage("leadOutMs") var leadOutMs = 0
     @AppStorage("captionFormat") private var captionFormatRaw = CaptionFormat.off.rawValue
 
     var captionFormat: CaptionFormat {
@@ -184,16 +186,20 @@ final class AppState: ObservableObject {
 
     // MARK: - Generation
 
-    func generate() {
-        guard canGenerate else { return }
+    /// `textOverride` generates a quick preview of just that text (e.g. the
+    /// editor selection) with all the same processing.
+    func generate(textOverride: String? = nil) {
+        guard canGenerate || textOverride != nil, phase == .ready else { return }
         let flag = CancellationFlag()
         currentCancellation = flag
         phase = .generating(0)
 
         let kind = engineKind
         let rules = PronunciationDictionary.parse(pronunciationRulesText)
-        // User dictionary first (their rules win), then number normalization.
-        var processedScript = PronunciationDictionary.apply(rules, to: script)
+        // Inline {word|sounds-like} overrides first (author-explicit wins),
+        // then the dictionary, then number normalization.
+        var processedScript = InlineOverrides.apply(to: textOverride ?? script)
+        processedScript = PronunciationDictionary.apply(rules, to: processedScript)
         processedScript = NumberNormalizer.normalize(processedScript,
                                                      preset: numberPreset)
         let segments = ScriptSegmenter.segment(processedScript,
@@ -369,13 +375,21 @@ final class AppState: ObservableObject {
         let destination = folder.appendingPathComponent(filename)
             .appendingPathExtension(exportFormat.fileExtension)
         do {
-            try AudioExporter.write(samples: audio.samples,
+            let paddedSamples = AudioProcessing.pad(audio.samples,
+                                                    sampleRate: audio.sampleRate,
+                                                    leadInMs: leadInMs,
+                                                    leadOutMs: leadOutMs)
+            try AudioExporter.write(samples: paddedSamples,
                                     sampleRate: audio.sampleRate,
                                     to: destination, format: exportFormat)
             if captionFormat != .off, !audio.cues.isEmpty {
+                // Shift cues by the lead-in (negative offset = later).
+                let shiftedCues = CaptionWriter.adjust(
+                    audio.cues, offset: -Double(leadInMs) / 1000,
+                    totalDuration: Double(paddedSamples.count) / Double(audio.sampleRate))
                 let captionText = captionFormat == .vtt
-                    ? CaptionWriter.vtt(audio.cues)
-                    : CaptionWriter.srt(audio.cues)
+                    ? CaptionWriter.vtt(shiftedCues)
+                    : CaptionWriter.srt(shiftedCues)
                 let captionURL = destination.deletingPathExtension()
                     .appendingPathExtension(captionFormat.fileExtension)
                 try captionText.write(to: captionURL, atomically: true,

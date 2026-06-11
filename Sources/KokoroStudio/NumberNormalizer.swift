@@ -65,6 +65,28 @@ enum NumberNormalizer {
         replace(#"°\s*F\b"#, " degrees Fahrenheit")
         replace(#"°"#, " degrees")
 
+        // Emails: support@school.edu -> "support at school dot edu".
+        result = transformMatches(
+            in: result,
+            pattern: #"\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b"#) { match in
+            match.replacingOccurrences(of: "@", with: " at ")
+                 .replacingOccurrences(of: ".", with: " dot ")
+        }
+
+        // URLs/domains with common TLDs (bounded list to avoid eating
+        // abbreviations like "e.g." or "U.S.").
+        result = transformMatches(
+            in: result,
+            pattern: #"\b(?:https?://)?(?:www\.)?[\w-]+\.(?:com|org|net|edu|gov|io|ai|co|us|uk|ca|dev|app|info)\b(?:/[\w./~-]*)?"#) { match in
+            var spoken = match
+                .replacingOccurrences(of: "https://", with: "")
+                .replacingOccurrences(of: "http://", with: "")
+            if spoken.hasSuffix("/") { spoken.removeLast() }
+            return spoken
+                .replacingOccurrences(of: ".", with: " dot ")
+                .replacingOccurrences(of: "/", with: " slash ")
+        }
+
         // Misc symbols.
         replace(#"\s&\s"#, " and ")
         replace(#"(\d)\s*×\s*(\d)"#, "$1 times $2")
@@ -73,6 +95,23 @@ enum NumberNormalizer {
 
         // Collapse doubled spaces introduced by replacements.
         replace(#"  +"#, " ")
+        return result
+    }
+
+    /// Replaces each regex match with a computed transformation (regex
+    /// templates can't transform match contents, e.g. dots inside a URL).
+    private static func transformMatches(in text: String, pattern: String,
+                                         _ transform: (String) -> String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: pattern,
+                                                   options: [.caseInsensitive])
+        else { return text }
+        var result = text
+        let matches = regex.matches(in: text,
+                                    range: NSRange(text.startIndex..., in: text))
+        for match in matches.reversed() {
+            guard let range = Range(match.range, in: result) else { continue }
+            result.replaceSubrange(range, with: transform(String(result[range])))
+        }
         return result
     }
 }

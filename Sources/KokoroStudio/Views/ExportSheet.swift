@@ -50,6 +50,20 @@ struct ExportSheet: View {
                 Toggle("Normalize loudness", isOn: $state.normalizeLoudness)
                     .help("Applied during generation: silence trim, -1 dBFS leveling, micro fades")
 
+                LabeledContent("Lead-in / out") {
+                    HStack(spacing: 6) {
+                        Stepper(value: $state.leadInMs, in: 0...3000, step: 250) {
+                            Text("\(Double(state.leadInMs) / 1000, specifier: "%.2g")s")
+                                .monospacedDigit()
+                        }
+                        Stepper(value: $state.leadOutMs, in: 0...3000, step: 250) {
+                            Text("\(Double(state.leadOutMs) / 1000, specifier: "%.2g")s")
+                                .monospacedDigit()
+                        }
+                    }
+                }
+                .help("Silence padding before/after the exported audio — for players that clip the first moments. Captions shift to match.")
+
                 LabeledContent("Folder") {
                     HStack {
                         Text(folderName)

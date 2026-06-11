@@ -18,6 +18,20 @@ struct PronunciationRule: Equatable {
     let kind: PronunciationRuleKind
 }
 
+enum InlineOverrides {
+    /// `{Roush|rowsh}` — one-off respelling at the exact spot it's written,
+    /// without a dictionary entry. Applied before the dictionary so explicit
+    /// author markup always wins.
+    static func apply(to text: String) -> String {
+        guard text.contains("{") else { return text }
+        guard let regex = try? NSRegularExpression(
+            pattern: #"\{([^|{}\n]+)\|([^{}\n]+)\}"#) else { return text }
+        return regex.stringByReplacingMatches(
+            in: text, range: NSRange(text.startIndex..., in: text),
+            withTemplate: "$2")
+    }
+}
+
 enum PronunciationDictionary {
     /// Parses rules from text, one per line:
     ///   `word = sounds-like`        respell
