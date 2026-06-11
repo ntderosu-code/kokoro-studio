@@ -231,7 +231,7 @@ struct ContentView: View {
         let estimate = DurationEstimator.estimate(
             script: state.script, pauses: state.pauseSettings,
             wordsPerSecond: state.calibratedWordsPerSecond, speed: state.speed)
-        return "\(words) words · est. \(DurationEstimator.formatted(estimate))"
+        return "\(words) words · estimated \(DurationEstimator.formatted(estimate))"
     }
 
     /// Word/duration count and pronunciation flags — outside the page card,
