@@ -65,6 +65,29 @@ enum NumberNormalizer {
         replace(#"°\s*F\b"#, " degrees Fahrenheit")
         replace(#"°"#, " degrees")
 
+        // ISO dates 2026-06-10 -> "June 10th, 2026" (before ranges eat the
+        // hyphens; the range rule already skips date-shaped tokens).
+        result = transformMatches(
+            in: result, pattern: #"\b(\d{4})-(\d{2})-(\d{2})\b"#) { match in
+            spokenDate(match, order: .yearMonthDay) ?? match
+        }
+        // US dates 6/10/2026 -> "June 10th, 2026".
+        result = transformMatches(
+            in: result, pattern: #"\b(\d{1,2})/(\d{1,2})/(\d{4})\b"#) { match in
+            spokenDate(match, order: .monthDayYear) ?? match
+        }
+
+        // Times: 3:00 -> "3 o'clock", 3:05 -> "3 oh 5", 3:30 -> "3 30".
+        result = transformMatches(
+            in: result, pattern: #"\b(\d{1,2}):([0-5]\d)\b(?!:)"#) { match in
+            let parts = match.split(separator: ":")
+            guard parts.count == 2, let minute = Int(parts[1]) else { return match }
+            let hour = String(parts[0])
+            if minute == 0 { return "\(hour) o'clock" }
+            if minute < 10 { return "\(hour) oh \(minute)" }
+            return "\(hour) \(minute)"
+        }
+
         // Emails: support@school.edu -> "support at school dot edu".
         result = transformMatches(
             in: result,
@@ -96,6 +119,39 @@ enum NumberNormalizer {
         // Collapse doubled spaces introduced by replacements.
         replace(#"  +"#, " ")
         return result
+    }
+
+    private enum DateOrder { case yearMonthDay, monthDayYear }
+
+    private static let monthNames = ["", "January", "February", "March", "April",
+                                     "May", "June", "July", "August", "September",
+                                     "October", "November", "December"]
+
+    private static func ordinal(_ day: Int) -> String {
+        let suffix: String
+        switch day % 100 {
+        case 11, 12, 13: suffix = "th"
+        default:
+            switch day % 10 {
+            case 1: suffix = "st"
+            case 2: suffix = "nd"
+            case 3: suffix = "rd"
+            default: suffix = "th"
+            }
+        }
+        return "\(day)\(suffix)"
+    }
+
+    private static func spokenDate(_ match: String, order: DateOrder) -> String? {
+        let parts = match.split { $0 == "-" || $0 == "/" }.compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        let (year, month, day): (Int, Int, Int)
+        switch order {
+        case .yearMonthDay: (year, month, day) = (parts[0], parts[1], parts[2])
+        case .monthDayYear: (year, month, day) = (parts[2], parts[0], parts[1])
+        }
+        guard (1...12).contains(month), (1...31).contains(day) else { return nil }
+        return "\(monthNames[month]) \(ordinal(day)), \(year)"
     }
 
     /// Replaces each regex match with a computed transformation (regex

@@ -27,22 +27,31 @@ unzip, drag to Applications, double-click. macOS 14+ (Apple Silicon & Intel).
 **Narration control** (built for instructional content)
 - Pause control by type: paragraph, sentence (`. ! ?`), clause (`, ; :`),
   and heading (`#` lines) — plus inline `[pause:800]` markers
-- Pronunciation dictionary with acronym modes: respell anything, or use
-  `APA = @letters`, `NASA = @word`, `IEP = @letters-first`
-- Number & symbol normalization: `$5.50`, `25%`, `1–2`, `v1.2`, `x²`, `°C`
-  read naturally
+- `*emphasis*` markers: a breath before and after, slightly slower delivery
+- Per-speaker voice **and speed** for dialogue (`@Maya:` lines)
+- Pronunciation dictionary with acronym modes (`APA = @letters`,
+  `NASA = @word`, `IEP = @letters-first`) plus one-off inline overrides:
+  `{Roush|rowsh}`
+- Pronunciation linter flags unknown acronyms with one-click dictionary add
+- Number & symbol normalization: `$5.50`, `25%`, `1–2`, `v1.2`, `x²`, `°C`,
+  dates, times, URLs and emails read naturally
 - Named profiles lock a whole course to one consistent sound
 
 **Output**
 - WAV (lossless) or M4A (AAC) export
 - Synced **VTT/SRT captions** with sample-accurate sentence cues
+- **Module splitting**: `## file: lesson-2` markers export one audio +
+  caption file per section from a single document
 - Loudness normalization: silence trim, −1 dBFS leveling, anti-click fades
+- Lead-in/lead-out silence padding for LMS players that clip
 - Live estimated audio length that calibrates from your actual generations
 
 **Editor**
 - Find & replace (native find bar, ⌘F / ⌥⌘F)
 - Apple Intelligence **Writing Tools** in the toolbar (macOS 15.2+)
+- **Preview Selection** (⇧⌘↩): audition just the selected sentence
 - Quick-add to dictionary: select a word, press ⌘D
+- Script syntax cheat sheet (? in the toolbar)
 - In-app playback with scrubbing
 
 ## Keyboard shortcuts

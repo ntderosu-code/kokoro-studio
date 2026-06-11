@@ -29,9 +29,19 @@ final class NumberNormalizerTests: XCTestCase {
                        "Allow 10 to 15 minutes.")
     }
 
-    func testISODateNotTreatedAsRange() {
+    func testISODateSpoken() {
         XCTAssertEqual(natural("Due 2026-06-10 at noon."),
-                       "Due 2026-06-10 at noon.")
+                       "Due June 10th, 2026 at noon.")
+    }
+
+    func testUSDateSpoken() {
+        XCTAssertEqual(natural("Starts 6/1/2026 sharp."),
+                       "Starts June 1st, 2026 sharp.")
+    }
+
+    func testTimes() {
+        XCTAssertEqual(natural("Meet at 3:30 or 4:05 or 5:00."),
+                       "Meet at 3 30 or 4 oh 5 or 5 o'clock.")
     }
 
     func testSuperscriptsAndDegrees() {

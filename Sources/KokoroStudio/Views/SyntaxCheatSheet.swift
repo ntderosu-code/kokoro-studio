@@ -18,6 +18,8 @@ struct SyntaxCheatSheet: View {
         Entry(syntax: "APA = @letters", meaning: "Dictionary: spell out (A-P-A)"),
         Entry(syntax: "IEP = @letters-first", meaning: "Spell out first use, say normally after"),
         Entry(syntax: "NASA = @word", meaning: "Dictionary: say as written"),
+        Entry(syntax: "*key term*", meaning: "Emphasis: a breath before and after, slightly slower"),
+        Entry(syntax: "## file: lesson-2", meaning: "Module marker: export splits into one file per section"),
     ]
 
     var body: some View {

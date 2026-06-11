@@ -111,11 +111,15 @@ struct ScriptSegment: Equatable {
     let pauseAfterMs: Int
     /// Speaker tag from `@Name:` lines; nil means the default narrator.
     let speaker: String?
+    /// Speed multiplier for `*emphasized*` text (slightly slower).
+    let speedMultiplier: Float
 
-    init(text: String, pauseAfterMs: Int, speaker: String? = nil) {
+    init(text: String, pauseAfterMs: Int, speaker: String? = nil,
+         speedMultiplier: Float = 1) {
         self.text = text
         self.pauseAfterMs = pauseAfterMs
         self.speaker = speaker
+        self.speedMultiplier = speedMultiplier
     }
 }
 
@@ -153,6 +157,7 @@ enum ScriptSegmenter {
         let anyPause = pauses.paragraphMs > 0 || pauses.sentenceMs > 0
             || pauses.clauseMs > 0 || pauses.headingMs > 0
         let hasSyntax = trimmedScript.contains("[pause")
+            || trimmedScript.contains("*")
             || lines.contains { $0.hasPrefix("@") || $0.hasPrefix("#") }
         if !anyPause && !sentenceSplit && !hasSyntax {
             return [ScriptSegment(text: trimmedScript, pauseAfterMs: 0)]
@@ -183,8 +188,8 @@ enum ScriptSegmenter {
             let endOfLinePause = isLastLine ? 0
                 : (isHeading ? pauses.headingMs : pauses.paragraphMs)
 
-            // Inline pause markers split the line into pieces.
-            let pieces = splitInlineMarkers(line)
+            // Inline pause markers, then *emphasis* spans, split the line.
+            let pieces = splitInlineMarkers(line).flatMap(splitEmphasis)
             for (pieceIndex, piece) in pieces.enumerated() {
                 let isLastPiece = pieceIndex == pieces.count - 1
                 let pieceEndPause = piece.markerPauseMs
@@ -197,6 +202,16 @@ enum ScriptSegmenter {
                         segments.append(ScriptSegment(text: "", pauseAfterMs: pieceEndPause,
                                                       speaker: currentSpeaker))
                     }
+                    continue
+                }
+
+                if piece.emphasized {
+                    // A breath before and after, slightly slower delivery.
+                    segments.append(ScriptSegment(
+                        text: piece.text,
+                        pauseAfterMs: max(pieceEndPause, emphasisPauseMs),
+                        speaker: currentSpeaker,
+                        speedMultiplier: emphasisSpeedMultiplier))
                     continue
                 }
 
@@ -236,9 +251,50 @@ enum ScriptSegmenter {
 
     // MARK: - Internals
 
+    static let emphasisPauseMs = 150
+    static let emphasisSpeedMultiplier: Float = 0.92
+
     private struct MarkerPiece {
         let text: String
         let markerPauseMs: Int? // pause from a [pause:N] marker ending this piece
+        var emphasized = false
+    }
+
+    /// "*key term* matters" -> [("key term", em), ("matters")]. A breath is
+    /// inserted before the emphasized span by ending the preceding piece
+    /// with the emphasis pause.
+    private static func splitEmphasis(_ piece: MarkerPiece) -> [MarkerPiece] {
+        guard piece.text.contains("*"),
+              let regex = try? NSRegularExpression(pattern: #"\*([^*\n]{1,80})\*"#)
+        else { return [piece] }
+
+        var result: [MarkerPiece] = []
+        var remainder = piece.text
+        while let match = regex.firstMatch(
+            in: remainder, range: NSRange(remainder.startIndex..., in: remainder)),
+            let full = Range(match.range, in: remainder),
+            let inner = Range(match.range(at: 1), in: remainder) {
+            let before = String(remainder[..<full.lowerBound])
+                .trimmingCharacters(in: .whitespaces)
+            if !before.isEmpty {
+                result.append(MarkerPiece(text: before,
+                                          markerPauseMs: emphasisPauseMs))
+            }
+            result.append(MarkerPiece(text: String(remainder[inner]),
+                                      markerPauseMs: nil, emphasized: true))
+            remainder = String(remainder[full.upperBound...])
+        }
+        let tail = remainder.trimmingCharacters(in: .whitespaces)
+        if !tail.isEmpty {
+            result.append(MarkerPiece(text: tail,
+                                      markerPauseMs: piece.markerPauseMs))
+        } else if let last = result.indices.last {
+            // Emphasis ended the piece: keep the original marker pause.
+            result[last] = MarkerPiece(text: result[last].text,
+                                       markerPauseMs: piece.markerPauseMs,
+                                       emphasized: result[last].emphasized)
+        }
+        return result.isEmpty ? [piece] : result
     }
 
     /// "Wait[pause:800] now go" -> [("Wait", 800), ("now go", nil)]

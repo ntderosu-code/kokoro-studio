@@ -5,6 +5,13 @@ struct ContentView: View {
     @StateObject private var player = PlayerController()
     @State private var quickAddWord: String?
     @State private var showingSyntaxHelp = false
+    @State private var showingLinter = false
+
+    private var pronunciationSuspects: [String] {
+        ScriptLinter.acronymSuspects(
+            in: state.script,
+            coveredBy: PronunciationDictionary.parse(state.pronunciationRulesText))
+    }
     @State private var showingExportSheet = false
     @State private var showingSaveProfile = false
     @State private var newProfileName = ""
@@ -195,6 +202,40 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .help("Estimated audio length — calibrates from your actual generations")
+            }
+            if !state.isGenerating, !pronunciationSuspects.isEmpty {
+                Button {
+                    showingLinter = true
+                } label: {
+                    Label("\(pronunciationSuspects.count)",
+                          systemImage: "exclamationmark.bubble")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.orange)
+                .help("Acronyms that may be mispronounced — click to review")
+                .popover(isPresented: $showingLinter, arrowEdge: .top) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Possible pronunciation issues")
+                            .font(.headline)
+                        Text("ALL-CAPS terms with no dictionary rule. Add @letters to spell them out, or @word to silence the flag.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ForEach(pronunciationSuspects, id: \.self) { token in
+                            HStack {
+                                Text(token).font(.body.monospaced())
+                                Spacer()
+                                Button("Add…") {
+                                    showingLinter = false
+                                    quickAddWord = token
+                                }
+                                .controlSize(.small)
+                            }
+                        }
+                    }
+                    .padding(14)
+                    .frame(width: 320)
+                }
             }
             Spacer()
             if state.isGenerating {

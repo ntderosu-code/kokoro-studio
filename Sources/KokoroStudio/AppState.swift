@@ -82,6 +82,23 @@ final class AppState: ObservableObject {
             }
         }
     }
+
+    @AppStorage("speakerSpeeds") var speakerSpeedsJSON = ""
+
+    /// Speaker name -> speed multiplier (1.0 = the main Speed setting).
+    var speakerSpeeds: [String: Double] {
+        get {
+            guard let data = speakerSpeedsJSON.data(using: .utf8),
+                  let map = try? JSONDecoder().decode([String: Double].self, from: data)
+            else { return [:] }
+            return map
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                speakerSpeedsJSON = String(data: data, encoding: .utf8) ?? ""
+            }
+        }
+    }
     @AppStorage("engineKind") private var engineKindRaw = TTSEngineKind.kokoro.rawValue
     @AppStorage("pocketVoicePath") var pocketVoicePath = ""
     @AppStorage("normalizeLoudness") var normalizeLoudness = true
@@ -207,6 +224,7 @@ final class AppState: ObservableObject {
                                                sentenceSplit: captionFormat != .off)
         let voice = voiceID
         let speakerMap = speakerVoices
+        let speakerSpeedMap = speakerSpeeds
         let speedValue = Float(speed)
         let voiceReferenceURL = pocketVoiceURL
         let kokoroEngine = engine
@@ -214,80 +232,23 @@ final class AppState: ObservableObject {
 
         Task.detached(priority: .userInitiated) {
             do {
-                let synthesizeSegment: (ScriptSegment, @escaping (Float) -> Bool) -> [Float]
-                let sampleRate: Int
-
-                switch kind {
-                case .kokoro:
-                    guard let kokoroEngine else { return }
-                    sampleRate = kokoroEngine.sampleRate
-                    synthesizeSegment = { segment, onProgress in
-                        let segmentVoice = segment.speaker
-                            .flatMap { speakerMap[$0] } ?? voice
-                        return kokoroEngine.synthesize(text: segment.text,
-                                                       voiceID: segmentVoice,
-                                                       speed: speedValue,
-                                                       progress: onProgress)
-                    }
-                case .pocket:
-                    let pocket: PocketEngine
-                    if let cachedPocketEngine {
-                        pocket = cachedPocketEngine
-                    } else {
-                        guard let directory = AppState.locatePocketDirectory() else {
-                            throw KokoroEngineError.modelLoadFailed(
-                                "Pocket TTS model folder not found in the app bundle")
+                let plan = try await self.makeSynthesisPlan(
+                    kind: kind, kokoroEngine: kokoroEngine,
+                    cachedPocketEngine: cachedPocketEngine,
+                    voiceReferenceURL: voiceReferenceURL, voice: voice,
+                    speakerMap: speakerMap, speakerSpeedMap: speakerSpeedMap,
+                    speedValue: speedValue)
+                let (samples, results) = AppState.runSegments(
+                    segments, plan: plan, flag: flag) { overall in
+                    Task { @MainActor in
+                        if case .generating = self.phase {
+                            self.phase = .generating(overall)
                         }
-                        pocket = try PocketEngine(modelDirectory: directory)
-                        await MainActor.run { self.pocketEngine = pocket }
-                    }
-                    guard let voiceReferenceURL else {
-                        throw KokoroEngineError.modelLoadFailed(
-                            "no voice sample selected for Pocket TTS")
-                    }
-                    let reference = try ReferenceAudioLoader.load(url: voiceReferenceURL)
-                    sampleRate = pocket.sampleRate
-                    synthesizeSegment = { segment, onProgress in
-                        pocket.synthesize(text: segment.text,
-                                          referenceAudio: reference.samples,
-                                          referenceSampleRate: reference.sampleRate,
-                                          speed: speedValue, progress: onProgress)
                     }
                 }
-
-                var allSamples: [Float] = []
-                var segmentResults: [(text: String, sampleCount: Int, pauseAfterMs: Int)] = []
-                let segmentCount = max(segments.count, 1)
-                for (index, segment) in segments.enumerated() {
-                    if flag.isCancelled { break }
-                    // Silence-only segments (from bare [pause] markers).
-                    if segment.text.isEmpty {
-                        let silenceFrames = sampleRate * segment.pauseAfterMs / 1000
-                        allSamples.append(contentsOf: [Float](repeating: 0, count: silenceFrames))
-                        segmentResults.append(("", 0, segment.pauseAfterMs))
-                        continue
-                    }
-                    let segmentSamples = synthesizeSegment(segment) { progress in
-                        let overall = (Float(index) + progress) / Float(segmentCount)
-                        Task { @MainActor in
-                            if case .generating = self.phase {
-                                self.phase = .generating(overall)
-                            }
-                        }
-                        return !flag.isCancelled
-                    }
-                    allSamples.append(contentsOf: segmentSamples)
-                    segmentResults.append((segment.text, segmentSamples.count,
-                                           segment.pauseAfterMs))
-                    if segment.pauseAfterMs > 0, !flag.isCancelled {
-                        let silenceFrames = sampleRate * segment.pauseAfterMs / 1000
-                        allSamples.append(contentsOf: [Float](repeating: 0, count: silenceFrames))
-                    }
-                }
-                let samples = allSamples
-                let results = segmentResults
                 await MainActor.run {
-                    self.finishGeneration(samples: samples, sampleRate: sampleRate,
+                    self.finishGeneration(samples: samples,
+                                          sampleRate: plan.sampleRate,
                                           cancelled: flag.isCancelled,
                                           segmentResults: results,
                                           speed: Double(speedValue))
@@ -297,6 +258,217 @@ final class AppState: ObservableObject {
                     self.phase = .ready
                     self.currentCancellation = nil
                     self.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    // MARK: - Synthesis core (shared by Generate and module export)
+
+    struct SynthesisPlan {
+        let synthesize: (ScriptSegment, @escaping (Float) -> Bool) -> [Float]
+        let sampleRate: Int
+    }
+
+    /// Builds the engine-specific segment synthesizer; loads Pocket lazily.
+    private func makeSynthesisPlan(kind: TTSEngineKind,
+                                   kokoroEngine: KokoroEngine?,
+                                   cachedPocketEngine: PocketEngine?,
+                                   voiceReferenceURL: URL?,
+                                   voice: Int,
+                                   speakerMap: [String: Int],
+                                   speakerSpeedMap: [String: Double],
+                                   speedValue: Float) async throws -> SynthesisPlan {
+        switch kind {
+        case .kokoro:
+            guard let kokoroEngine else {
+                throw KokoroEngineError.modelLoadFailed("Kokoro engine not loaded yet")
+            }
+            return SynthesisPlan(
+                synthesize: { segment, onProgress in
+                    let segmentVoice = segment.speaker
+                        .flatMap { speakerMap[$0] } ?? voice
+                    let speakerSpeed = segment.speaker
+                        .flatMap { speakerSpeedMap[$0] }.map(Float.init) ?? speedValue
+                    return kokoroEngine.synthesize(text: segment.text,
+                                                   voiceID: segmentVoice,
+                                                   speed: speakerSpeed * segment.speedMultiplier,
+                                                   progress: onProgress)
+                },
+                sampleRate: kokoroEngine.sampleRate)
+        case .pocket:
+            let pocket: PocketEngine
+            if let cachedPocketEngine {
+                pocket = cachedPocketEngine
+            } else {
+                guard let directory = AppState.locatePocketDirectory() else {
+                    throw KokoroEngineError.modelLoadFailed(
+                        "Pocket TTS model folder not found in the app bundle")
+                }
+                pocket = try PocketEngine(modelDirectory: directory)
+                await MainActor.run { self.pocketEngine = pocket }
+            }
+            guard let voiceReferenceURL else {
+                throw KokoroEngineError.modelLoadFailed(
+                    "no voice sample selected for Pocket TTS")
+            }
+            let reference = try ReferenceAudioLoader.load(url: voiceReferenceURL)
+            return SynthesisPlan(
+                synthesize: { segment, onProgress in
+                    pocket.synthesize(text: segment.text,
+                                      referenceAudio: reference.samples,
+                                      referenceSampleRate: reference.sampleRate,
+                                      speed: speedValue * segment.speedMultiplier,
+                                      progress: onProgress)
+                },
+                sampleRate: pocket.sampleRate)
+        }
+    }
+
+    /// Runs segments through a plan, splicing pauses; reports 0…1 progress.
+    nonisolated static func runSegments(
+        _ segments: [ScriptSegment], plan: SynthesisPlan, flag: CancellationFlag,
+        onProgress: @escaping (Float) -> Void
+    ) -> (samples: [Float], results: [(text: String, sampleCount: Int, pauseAfterMs: Int)]) {
+        var allSamples: [Float] = []
+        var segmentResults: [(text: String, sampleCount: Int, pauseAfterMs: Int)] = []
+        let segmentCount = max(segments.count, 1)
+        for (index, segment) in segments.enumerated() {
+            if flag.isCancelled { break }
+            // Silence-only segments (from bare [pause] markers).
+            if segment.text.isEmpty {
+                let silenceFrames = plan.sampleRate * segment.pauseAfterMs / 1000
+                allSamples.append(contentsOf: [Float](repeating: 0, count: silenceFrames))
+                segmentResults.append(("", 0, segment.pauseAfterMs))
+                continue
+            }
+            let segmentSamples = plan.synthesize(segment) { progress in
+                onProgress((Float(index) + progress) / Float(segmentCount))
+                return !flag.isCancelled
+            }
+            allSamples.append(contentsOf: segmentSamples)
+            segmentResults.append((segment.text, segmentSamples.count,
+                                   segment.pauseAfterMs))
+            if segment.pauseAfterMs > 0, !flag.isCancelled {
+                let silenceFrames = plan.sampleRate * segment.pauseAfterMs / 1000
+                allSamples.append(contentsOf: [Float](repeating: 0, count: silenceFrames))
+            }
+        }
+        return (allSamples, segmentResults)
+    }
+
+    /// Splits the script at `## file:` markers and exports each module as
+    /// its own audio (+ captions) file into the chosen folder.
+    func exportModules() {
+        let modules = ModuleSplitter.split(script)
+        guard modules.count > 1, phase == .ready else { return }
+        let folder: URL
+        if !outputFolderPath.isEmpty,
+           FileManager.default.fileExists(atPath: outputFolderPath) {
+            folder = URL(fileURLWithPath: outputFolderPath)
+        } else if let chosen = Self.chooseFolder() {
+            outputFolderPath = chosen.path
+            folder = chosen
+        } else {
+            return
+        }
+
+        let flag = CancellationFlag()
+        currentCancellation = flag
+        phase = .generating(0)
+
+        let kind = engineKind
+        let rules = PronunciationDictionary.parse(pronunciationRulesText)
+        let preset = numberPreset
+        let pauses = pauseSettings
+        let sentenceSplit = captionFormat != .off
+        let voice = voiceID
+        let speakerMap = speakerVoices
+        let speakerSpeedMap = speakerSpeeds
+        let speedValue = Float(speed)
+        let voiceReferenceURL = pocketVoiceURL
+        let kokoroEngine = engine
+        let cachedPocketEngine = pocketEngine
+        let format = exportFormat
+        let captions = captionFormat
+        let normalize = normalizeLoudness
+        let padIn = leadInMs
+        let padOut = leadOutMs
+
+        Task.detached(priority: .userInitiated) {
+            do {
+                let plan = try await self.makeSynthesisPlan(
+                    kind: kind, kokoroEngine: kokoroEngine,
+                    cachedPocketEngine: cachedPocketEngine,
+                    voiceReferenceURL: voiceReferenceURL, voice: voice,
+                    speakerMap: speakerMap, speakerSpeedMap: speakerSpeedMap,
+                    speedValue: speedValue)
+                var written: [URL] = []
+                for (moduleIndex, module) in modules.enumerated() {
+                    if flag.isCancelled { break }
+                    var text = InlineOverrides.apply(to: module.body)
+                    text = PronunciationDictionary.apply(rules, to: text)
+                    text = NumberNormalizer.normalize(text, preset: preset)
+                    let segments = ScriptSegmenter.segment(
+                        text, pauses: pauses, sentenceSplit: sentenceSplit)
+                    let base = Float(moduleIndex) / Float(modules.count)
+                    let span = 1 / Float(modules.count)
+                    let (rawSamples, results) = AppState.runSegments(
+                        segments, plan: plan, flag: flag) { progress in
+                        let overall = base + progress * span
+                        Task { @MainActor in
+                            if case .generating = self.phase {
+                                self.phase = .generating(overall)
+                            }
+                        }
+                    }
+                    if flag.isCancelled || rawSamples.isEmpty { continue }
+
+                    var cues = CaptionWriter.buildCues(segments: results,
+                                                       sampleRate: plan.sampleRate)
+                    var samples = rawSamples
+                    if normalize {
+                        let trimOffset = Double(AudioProcessing.leadingTrimCount(
+                            rawSamples, sampleRate: plan.sampleRate)) / Double(plan.sampleRate)
+                        samples = AudioProcessing.finalize(samples: rawSamples,
+                                                           sampleRate: plan.sampleRate)
+                        cues = CaptionWriter.adjust(cues, offset: trimOffset,
+                                                    totalDuration: Double(samples.count) / Double(plan.sampleRate))
+                    }
+                    samples = AudioProcessing.pad(samples, sampleRate: plan.sampleRate,
+                                                  leadInMs: padIn, leadOutMs: padOut)
+                    cues = CaptionWriter.adjust(cues, offset: -Double(padIn) / 1000,
+                                                totalDuration: Double(samples.count) / Double(plan.sampleRate))
+
+                    let safeName = module.name.replacingOccurrences(of: "/", with: "-")
+                    let audioURL = folder.appendingPathComponent(safeName)
+                        .appendingPathExtension(format.fileExtension)
+                    try AudioExporter.write(samples: samples,
+                                            sampleRate: plan.sampleRate,
+                                            to: audioURL, format: format)
+                    written.append(audioURL)
+                    if captions != .off, !cues.isEmpty {
+                        let captionText = captions == .vtt
+                            ? CaptionWriter.vtt(cues) : CaptionWriter.srt(cues)
+                        try captionText.write(
+                            to: folder.appendingPathComponent(safeName)
+                                .appendingPathExtension(captions.fileExtension),
+                            atomically: true, encoding: .utf8)
+                    }
+                }
+                let exported = written
+                await MainActor.run {
+                    self.phase = .ready
+                    self.currentCancellation = nil
+                    if let first = exported.first {
+                        NSWorkspace.shared.activateFileViewerSelecting([first])
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.phase = .ready
+                    self.currentCancellation = nil
+                    self.errorMessage = "Module export failed: \(error.localizedDescription)"
                 }
             }
         }

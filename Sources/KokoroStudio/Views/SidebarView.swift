@@ -222,12 +222,27 @@ struct SpeakersEditorView: View {
             } else {
                 Form {
                     ForEach(detectedSpeakers, id: \.self) { name in
-                        Picker(name, selection: Binding(
-                            get: { state.speakerVoices[name] ?? state.voiceID },
-                            set: { state.speakerVoices[name] = $0 })) {
-                            ForEach(VoiceCatalog.all) { voice in
-                                Text(voice.displayName).tag(voice.id)
+                        Section(name) {
+                            Picker("Voice", selection: Binding(
+                                get: { state.speakerVoices[name] ?? state.voiceID },
+                                set: { state.speakerVoices[name] = $0 })) {
+                                ForEach(VoiceCatalog.all) { voice in
+                                    Text(voice.displayName).tag(voice.id)
+                                }
                             }
+                            LabeledContent("Speed") {
+                                Text(String(format: "%.2f×",
+                                            state.speakerSpeeds[name] ?? state.speed))
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                            Slider(value: Binding(
+                                get: { state.speakerSpeeds[name] ?? state.speed },
+                                set: { state.speakerSpeeds[name] = $0 }),
+                                   in: 0.5...2.0, step: 0.05) {
+                                Text("Speed for \(name)")
+                            }
+                            .labelsHidden()
                         }
                     }
                 }
@@ -243,7 +258,7 @@ struct SpeakersEditorView: View {
             }
             .padding(12)
         }
-        .frame(width: 440, height: 360)
+        .frame(width: 440, height: 460)
     }
 }
 

@@ -5,6 +5,10 @@ struct ExportSheet: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.dismiss) private var dismiss
 
+    private var moduleCount: Int {
+        ModuleSplitter.split(state.script).count
+    }
+
     private var folderName: String {
         state.outputFolderPath.isEmpty
             ? "Ask when exporting"
@@ -81,15 +85,29 @@ struct ExportSheet: View {
             Divider()
 
             HStack {
+                if moduleCount > 1 {
+                    Text("\(moduleCount) modules detected (## file: markers)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
-                Button("Export") {
-                    state.export()
-                    dismiss()
+                if moduleCount > 1 {
+                    Button("Export \(moduleCount) Modules") {
+                        state.exportModules()
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                } else {
+                    Button("Export") {
+                        state.export()
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(state.lastAudio == nil)
                 }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(state.lastAudio == nil)
             }
             .padding(12)
         }
