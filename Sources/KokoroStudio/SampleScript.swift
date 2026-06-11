@@ -9,17 +9,17 @@ enum SampleScript {
     # Welcome to Kokoro Studio
     This sample script is a guided tour. Press command return to generate \
     it, then listen along.
-    The line above starts with a hash sign, so it reads as a heading and \
-    gets a longer pause after it.
+    The line above starts with a hash sign, so it becomes a heading. It \
+    is read as written, then followed by a longer pause.
     You can ask for a deliberate beat anywhere. [pause:800] That silence \
     came from an inline pause marker.
-    Words wrapped in asterisks get *gentle emphasis*, with a breath on \
-    either side.
+    Words wrapped in asterisks, like *this key term*, are read slightly \
+    slower with a breath on either side. They are not any louder.
     @Maya: A line that starts with an at-sign and a name becomes dialogue.
     @Sam: Open Speakers in the sidebar to give each of us a different \
     voice and speed.
-    The pronunciation dictionary controls acronyms: NASA can read as a \
-    word, while APA spells out letter by letter.
+    Acronyms like NASA and APA are flagged below the editor until you \
+    add dictionary rules saying how each one should be read.
     One-off fixes go right in the text, like the name {Roush|rowsh}.
     Numbers and symbols read naturally: $5.50, 25%, and version v1.2.
     ## file: splitting-demo
