@@ -54,6 +54,25 @@ struct ExportSheet: View {
                 Toggle("Normalize loudness", isOn: $state.normalizeLoudness)
                     .help("Applied during generation: silence trim, -1 dBFS leveling, micro fades")
 
+                Picker("Loudness", selection: Binding(
+                    get: { state.loudnessPreset },
+                    set: { state.loudnessPreset = $0 })) {
+                    ForEach(LoudnessPreset.allCases) { preset in
+                        Text(preset.label).tag(preset)
+                    }
+                }
+                .help("Overall loudness at export. LMS keeps the classic −1 dBFS leveling; the others target an integrated LUFS level for podcast or video platforms.")
+
+                if state.loudnessPreset == .custom {
+                    LabeledContent("Target") {
+                        Stepper(value: $state.customLoudnessLUFS,
+                                in: -36...(-8), step: 1) {
+                            Text("\(Int(state.customLoudnessLUFS)) LUFS")
+                                .monospacedDigit()
+                        }
+                    }
+                }
+
                 LabeledContent("Lead-in / out") {
                     HStack(spacing: 6) {
                         Stepper(value: $state.leadInMs, in: 0...3000, step: 250) {
@@ -111,6 +130,6 @@ struct ExportSheet: View {
             }
             .padding(12)
         }
-        .frame(width: 420, height: 360)
+        .frame(width: 420, height: 420)
     }
 }

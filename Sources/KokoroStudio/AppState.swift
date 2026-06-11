@@ -115,6 +115,14 @@ final class AppState: ObservableObject {
     @AppStorage("engineKind") private var engineKindRaw = TTSEngineKind.kokoro.rawValue
     @AppStorage("pocketVoicePath") var pocketVoicePath = ""
     @AppStorage("normalizeLoudness") var normalizeLoudness = true
+    @AppStorage("loudnessPreset") private var loudnessPresetRaw
+        = LoudnessPreset.lms.rawValue
+    @AppStorage("customLoudnessLUFS") var customLoudnessLUFS = -16.0
+
+    var loudnessPreset: LoudnessPreset {
+        get { LoudnessPreset(rawValue: loudnessPresetRaw) ?? .lms }
+        set { loudnessPresetRaw = newValue.rawValue }
+    }
     @AppStorage("calibratedWordsPerSecond") var calibratedWordsPerSecond
         = DurationEstimator.defaultWordsPerSecond
     @AppStorage("leadInMs") var leadInMs = 0
@@ -513,6 +521,7 @@ final class AppState: ObservableObject {
         let format = exportFormat
         let captions = captionFormat
         let normalize = normalizeLoudness
+        let loudnessTarget = loudnessPreset.targetLUFS(custom: customLoudnessLUFS)
         let padIn = leadInMs
         let padOut = leadOutMs
 
@@ -555,6 +564,11 @@ final class AppState: ObservableObject {
                                                            sampleRate: plan.sampleRate)
                         cues = CaptionWriter.adjust(cues, offset: trimOffset,
                                                     totalDuration: Double(samples.count) / Double(plan.sampleRate))
+                    }
+                    if let loudnessTarget {
+                        samples = LoudnessNormalizer.normalize(
+                            samples: samples, sampleRate: plan.sampleRate,
+                            targetLUFS: loudnessTarget)
                     }
                     samples = AudioProcessing.pad(samples, sampleRate: plan.sampleRate,
                                                   leadInMs: padIn, leadOutMs: padOut)
@@ -670,7 +684,13 @@ final class AppState: ObservableObject {
         let destination = folder.appendingPathComponent(filename)
             .appendingPathExtension(exportFormat.fileExtension)
         do {
-            let paddedSamples = AudioProcessing.pad(audio.samples,
+            var exportSamples = audio.samples
+            if let target = loudnessPreset.targetLUFS(custom: customLoudnessLUFS) {
+                exportSamples = LoudnessNormalizer.normalize(
+                    samples: exportSamples, sampleRate: audio.sampleRate,
+                    targetLUFS: target)
+            }
+            let paddedSamples = AudioProcessing.pad(exportSamples,
                                                     sampleRate: audio.sampleRate,
                                                     leadInMs: leadInMs,
                                                     leadOutMs: leadOutMs)
@@ -712,7 +732,9 @@ final class AppState: ObservableObject {
                 normalizeLoudness: normalizeLoudness,
                 exportFormat: exportFormat.rawValue,
                 speakerVoicesJSON: speakerVoicesJSON,
-                numberPreset: numberPreset.rawValue)
+                numberPreset: numberPreset.rawValue,
+                loudnessPreset: loudnessPreset.rawValue,
+                customLoudnessLUFS: customLoudnessLUFS)
     }
 
     func apply(_ profile: Profile) {
@@ -731,6 +753,9 @@ final class AppState: ObservableObject {
         speakerVoicesJSON = profile.speakerVoicesJSON
         numberPreset = profile.numberPreset
             .flatMap { NumberPreset(rawValue: $0) } ?? .natural
+        loudnessPreset = profile.loudnessPreset
+            .flatMap { LoudnessPreset(rawValue: $0) } ?? .lms
+        customLoudnessLUFS = profile.customLoudnessLUFS ?? -16.0
     }
 
     func chooseOutputFolder() {
