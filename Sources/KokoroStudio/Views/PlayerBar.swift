@@ -6,6 +6,20 @@ struct PlayerBar: View {
     var onExport: () -> Void = {}
     var onRegenerate: () -> Void = {}
 
+    @State private var peaks: [Float] = []
+    @State private var markers: [HeadingMarker] = []
+
+    private func rebuildWaveform() {
+        guard let audio = state.lastAudio else {
+            peaks = []
+            markers = []
+            return
+        }
+        peaks = WaveformBuilder.peaks(samples: audio.samples, buckets: 240)
+        markers = WaveformBuilder.headingMarkers(cues: audio.cues,
+                                                 script: audio.sourceScript)
+    }
+
     private func timeString(_ seconds: Double) -> String {
         let total = Int(seconds.rounded())
         return String(format: "%d:%02d", total / 60, total % 60)
@@ -45,12 +59,19 @@ struct PlayerBar: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
 
-            Slider(value: Binding(get: { player.currentTime },
-                                  set: { player.seek(to: $0) }),
-                   in: 0...max(player.duration, 0.01)) {
-                Text("Playback position")
+            if peaks.isEmpty {
+                Slider(value: Binding(get: { player.currentTime },
+                                      set: { player.seek(to: $0) }),
+                       in: 0...max(player.duration, 0.01)) {
+                    Text("Playback position")
+                }
+                .labelsHidden()
+            } else {
+                WaveformView(peaks: peaks, markers: markers,
+                             duration: player.duration,
+                             currentTime: player.currentTime,
+                             onSeek: { player.seek(to: $0) })
             }
-            .labelsHidden()
 
             Text(timeString(player.duration))
                 .font(.caption.monospacedDigit())
@@ -67,5 +88,7 @@ struct PlayerBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .onAppear { rebuildWaveform() }
+        .onChange(of: state.lastAudio?.previewWAV) { rebuildWaveform() }
     }
 }
