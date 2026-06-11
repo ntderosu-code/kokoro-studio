@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import AVFoundation
 import Combine
+import UserNotifications
 
 /// Clears preview state when a voice sample finishes playing.
 final class VoicePreviewDelegate: NSObject, AVAudioPlayerDelegate {
@@ -791,6 +792,256 @@ final class AppState: ObservableObject {
             }
         }
         return (allSamples, segmentResults)
+    }
+
+    // MARK: - Batch generation queue (#37)
+
+    struct BatchItem: Identifiable, Equatable {
+        let id: UUID
+        let title: String
+        var state: State
+
+        enum State: Equatable {
+            case queued
+            case rendering(Float)
+            case exported
+            case failed(String)
+        }
+    }
+
+    @Published var batchItems: [BatchItem] = []
+    @Published var batchRunning = false
+    @Published var showingBatchSheet = false
+    private var batchCancelled = false
+    private var batchActivity: NSObjectProtocol?
+
+    nonisolated static func batchFilename(title: String,
+                                          moduleName: String?) -> String {
+        var stem = title.replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespaces)
+        if stem.isEmpty { stem = "kokoro" }
+        if let moduleName { stem += " - \(moduleName)" }
+        return stem
+    }
+
+    func startBatch(documentIDs: [UUID]) {
+        guard !batchRunning, phase == .ready, !documentIDs.isEmpty else { return }
+        let folder: URL
+        if !outputFolderPath.isEmpty,
+           FileManager.default.fileExists(atPath: outputFolderPath) {
+            folder = URL(fileURLWithPath: outputFolderPath)
+        } else if let chosen = Self.chooseFolder() {
+            outputFolderPath = chosen.path
+            folder = chosen
+        } else {
+            return
+        }
+        saveCurrentDocumentNow()
+        batchItems = documentIDs.compactMap { id in
+            documents.first { $0.id == id }
+                .map { BatchItem(id: id, title: $0.title, state: .queued) }
+        }
+        batchCancelled = false
+        batchRunning = true
+        // A queued course render shouldn't die when the Mac idles.
+        batchActivity = ProcessInfo.processInfo.beginActivity(
+            options: [.idleSystemSleepDisabled],
+            reason: "Batch audio generation")
+        Task { await runBatch(folder: folder) }
+    }
+
+    func cancelBatch() {
+        batchCancelled = true
+        currentCancellation?.cancel()
+    }
+
+    func retryBatchItem(_ id: UUID) {
+        guard !batchRunning,
+              let index = batchItems.firstIndex(where: { $0.id == id }),
+              !outputFolderPath.isEmpty else {
+            return
+        }
+        batchItems[index].state = .queued
+        batchCancelled = false
+        batchRunning = true
+        let folder = URL(fileURLWithPath: outputFolderPath)
+        Task { await runBatch(folder: folder, only: [id]) }
+    }
+
+    private func runBatch(folder: URL, only: Set<UUID>? = nil) async {
+        var exported = 0
+        var failed = 0
+        for index in batchItems.indices {
+            if batchCancelled { break }
+            let item = batchItems[index]
+            if let only, !only.contains(item.id) { continue }
+            if item.state == .exported { continue }
+            batchItems[index].state = .rendering(0)
+            do {
+                try await renderDocument(id: item.id, folder: folder) { progress in
+                    Task { @MainActor in
+                        if self.batchItems.indices.contains(index) {
+                            self.batchItems[index].state = .rendering(progress)
+                        }
+                    }
+                }
+                batchItems[index].state = .exported
+                exported += 1
+            } catch {
+                batchItems[index].state = .failed(error.localizedDescription)
+                failed += 1
+            }
+        }
+        batchRunning = false
+        if let activity = batchActivity {
+            ProcessInfo.processInfo.endActivity(activity)
+            batchActivity = nil
+        }
+        notifyBatchFinished(exported: exported, failed: failed,
+                            cancelled: batchCancelled)
+    }
+
+    /// Renders one library document with ITS OWN profile (falling back to
+    /// the current settings), honoring module-split markers.
+    private func renderDocument(id: UUID, folder: URL,
+                                onProgress: @escaping @Sendable (Float) -> Void) async throws {
+        guard let meta = documents.first(where: { $0.id == id }) else {
+            throw KokoroEngineError.modelLoadFailed("script not found in library")
+        }
+        let text = id == currentDocumentID ? script : DocumentStore.loadText(id: id)
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw KokoroEngineError.modelLoadFailed("script is empty")
+        }
+
+        // Settings come from the document's profile when it has one.
+        let profile = meta.profileName.flatMap { ProfileStore.load(name: $0) }
+        let kind = profile.flatMap { TTSEngineKind(rawValue: $0.engineKind) }
+            ?? engineKind
+        let voice = profile?.voiceID ?? voiceID
+        let speedValue = Float(profile?.speed ?? speed)
+        let rules = PronunciationDictionary.parse(
+            profile?.pronunciationRules ?? pronunciationRulesText)
+        let pauses = profile.map {
+            PauseSettings(paragraphMs: $0.paragraphPauseMs,
+                          sentenceMs: $0.sentencePauseMs,
+                          clauseMs: $0.clausePauseMs,
+                          headingMs: $0.headingPauseMs)
+        } ?? pauseSettings
+        let captions = profile.flatMap { CaptionFormat(rawValue: $0.captionFormat) }
+            ?? captionFormat
+        let normalize = profile?.normalizeLoudness ?? normalizeLoudness
+        let format = profile.flatMap { ExportFormat(rawValue: $0.exportFormat) }
+            ?? exportFormat
+        let preset = profile?.numberPreset.flatMap { NumberPreset(rawValue: $0) }
+            ?? numberPreset
+        let loudnessTarget = (profile?.loudnessPreset
+            .flatMap { LoudnessPreset(rawValue: $0) } ?? loudnessPreset)
+            .targetLUFS(custom: profile?.customLoudnessLUFS ?? customLoudnessLUFS)
+        let speakerMap: [String: Int] = profile.flatMap {
+            guard let data = $0.speakerVoicesJSON.data(using: .utf8) else { return nil }
+            return try? JSONDecoder().decode([String: Int].self, from: data)
+        } ?? speakerVoices
+        let referenceURL: URL? = profile.map {
+            $0.pocketVoicePath.isEmpty ? pocketVoiceURL
+                : URL(fileURLWithPath: $0.pocketVoicePath)
+        } ?? pocketVoiceURL
+
+        let flag = CancellationFlag()
+        currentCancellation = flag
+        let plan = try await makeSynthesisPlan(
+            kind: kind, kokoroEngine: engine,
+            cachedPocketEngine: pocketEngine,
+            voiceReferenceURL: referenceURL, voice: voice,
+            speakerMap: speakerMap, speakerSpeedMap: speakerSpeeds,
+            speedValue: speedValue)
+
+        let modules = ModuleSplitter.split(text)
+        let padIn = leadInMs
+        let padOut = leadOutMs
+        let title = meta.title
+
+        try await Task.detached(priority: .userInitiated) {
+            for (moduleIndex, module) in modules.enumerated() {
+                if flag.isCancelled { break }
+                var processed = InlineOverrides.apply(to: module.body)
+                processed = PronunciationDictionary.apply(rules, to: processed)
+                processed = NumberNormalizer.normalize(processed, preset: preset)
+                let segments = ScriptSegmenter.segment(
+                    processed, pauses: pauses, sentenceSplit: captions != .off)
+                let base = Float(moduleIndex) / Float(modules.count)
+                let span = 1 / Float(modules.count)
+                let (rawSamples, results) = AppState.runSegments(
+                    segments, plan: plan, flag: flag) { progress in
+                    onProgress(base + progress * span)
+                }
+                if flag.isCancelled || rawSamples.isEmpty { continue }
+
+                var cues = CaptionWriter.buildCues(segments: results,
+                                                   sampleRate: plan.sampleRate)
+                var samples = rawSamples
+                if normalize {
+                    let trimOffset = Double(AudioProcessing.leadingTrimCount(
+                        rawSamples, sampleRate: plan.sampleRate))
+                        / Double(plan.sampleRate)
+                    samples = AudioProcessing.finalize(samples: rawSamples,
+                                                       sampleRate: plan.sampleRate)
+                    cues = CaptionWriter.adjust(cues, offset: trimOffset,
+                                                totalDuration: Double(samples.count) / Double(plan.sampleRate))
+                }
+                if let loudnessTarget {
+                    samples = LoudnessNormalizer.normalize(
+                        samples: samples, sampleRate: plan.sampleRate,
+                        targetLUFS: loudnessTarget)
+                }
+                samples = AudioProcessing.pad(samples, sampleRate: plan.sampleRate,
+                                              leadInMs: padIn, leadOutMs: padOut)
+                cues = CaptionWriter.adjust(cues, offset: -Double(padIn) / 1000,
+                                            totalDuration: Double(samples.count) / Double(plan.sampleRate))
+
+                let filename = AppState.batchFilename(
+                    title: title,
+                    moduleName: modules.count > 1 ? module.name : nil)
+                let audioURL = folder.appendingPathComponent(filename)
+                    .appendingPathExtension(format.fileExtension)
+                try AudioExporter.write(samples: samples,
+                                        sampleRate: plan.sampleRate,
+                                        to: audioURL, format: format)
+                if captions != .off, !cues.isEmpty {
+                    let captionText = captions == .vtt
+                        ? CaptionWriter.vtt(cues) : CaptionWriter.srt(cues)
+                    try captionText.write(
+                        to: folder.appendingPathComponent(filename)
+                            .appendingPathExtension(captions.fileExtension),
+                        atomically: true, encoding: .utf8)
+                }
+            }
+        }.value
+        currentCancellation = nil
+        if flag.isCancelled {
+            throw KokoroEngineError.modelLoadFailed("cancelled")
+        }
+    }
+
+    private func notifyBatchFinished(exported: Int, failed: Int,
+                                     cancelled: Bool) {
+        // UNUserNotificationCenter requires a real bundle; the bare dev
+        // binary has none and would crash.
+        guard Bundle.main.bundleIdentifier != nil else {
+            NSSound.beep()
+            return
+        }
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = cancelled ? "Batch cancelled" : "Batch finished"
+            content.body = "\(exported) exported"
+                + (failed > 0 ? ", \(failed) failed" : "")
+            center.add(UNNotificationRequest(
+                identifier: UUID().uuidString, content: content,
+                trigger: nil))
+        }
     }
 
     // MARK: - Patch re-render (#11)
