@@ -56,29 +56,38 @@ struct ContentView: View {
     }
 
     private var editorPane: some View {
-        EditorView()
-            .padding(14)
-            .frame(minWidth: 380, maxWidth: .infinity,
-                   minHeight: 200, maxHeight: .infinity)
-            // Glass floats over the page so the script scrolls beneath it —
-            // that's what gives Liquid Glass something to refract.
-            .overlay(alignment: .bottom) {
-                BarGlassContainer(spacing: 10) {
-                    VStack(spacing: 10) {
-                        if state.lastAudio != nil {
-                            PlayerBar(player: player,
-                                      onExport: { showingExportSheet = true })
+        VStack(spacing: 6) {
+            EditorView()
+                // Glass floats over the page so the script scrolls beneath
+                // it — that gives Liquid Glass something to refract.
+                .overlay(alignment: .bottom) {
+                    BarGlassContainer(spacing: 10) {
+                        VStack(spacing: 10) {
+                            if state.lastAudio != nil {
+                                PlayerBar(player: player,
+                                          onExport: { showingExportSheet = true },
+                                          onRegenerate: {
+                                              player.stop()
+                                              state.generate()
+                                          })
+                                    .barGlass()
+                            }
+                            actionBar
                                 .barGlass()
                         }
-                        actionBar
-                            .barGlass()
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 16)
                     }
-                    .padding(.horizontal, 28)
-                    .padding(.bottom, 28)
+                    .animation(.spring(duration: 0.35),
+                               value: state.lastAudio?.previewWAV)
                 }
-                .animation(.spring(duration: 0.35),
-                           value: state.lastAudio?.previewWAV)
-            }
+            scriptInfoRow
+        }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
+            .frame(minWidth: 380, maxWidth: .infinity,
+                   minHeight: 200, maxHeight: .infinity)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Menu {
@@ -174,7 +183,12 @@ struct ContentView: View {
                                    rulesText: $state.pronunciationRulesText)
         }
         .onChange(of: state.lastAudio?.previewWAV) { _, url in
-            if let url { player.load(url: url) }
+            if let url {
+                player.load(url: url)
+                if state.autoplayAfterGenerate {
+                    player.togglePlayPause()
+                }
+            }
         }
         .alert("Something went wrong",
                isPresented: Binding(get: { state.errorMessage != nil },
@@ -194,27 +208,28 @@ struct ContentView: View {
         return "\(words) words · est. \(DurationEstimator.formatted(estimate))"
     }
 
-    private var actionBar: some View {
-        HStack(spacing: 12) {
-            statusView
-            if !state.isGenerating, !scriptSummary.isEmpty {
+    /// Word/duration count and pronunciation flags — outside the page card,
+    /// anchored under the text area (#18).
+    private var scriptInfoRow: some View {
+        HStack(spacing: 14) {
+            if !scriptSummary.isEmpty {
                 Text(scriptSummary)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .help("Estimated audio length — calibrates from your actual generations")
             }
-            if !state.isGenerating, !pronunciationSuspects.isEmpty {
+            if !pronunciationSuspects.isEmpty {
                 Button {
                     showingLinter = true
                 } label: {
-                    Label("\(pronunciationSuspects.count)",
+                    Label("\(pronunciationSuspects.count) pronunciation flags",
                           systemImage: "exclamationmark.bubble")
-                        .font(.caption)
+                        .font(.subheadline)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.orange)
                 .help("Acronyms that may be mispronounced — click to review")
-                .popover(isPresented: $showingLinter, arrowEdge: .top) {
+                .popover(isPresented: $showingLinter, arrowEdge: .bottom) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Possible pronunciation issues")
                             .font(.headline)
@@ -238,6 +253,15 @@ struct ContentView: View {
                 }
             }
             Spacer()
+        }
+        .padding(.horizontal, 4)
+        .frame(height: 22)
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: 12) {
+            statusView
+            Spacer()
             if state.isGenerating {
                 Button("Stop") {
                     state.cancelGeneration()
@@ -260,15 +284,19 @@ struct ContentView: View {
                 .disabled(state.phase != .ready)
                 .help("Generate only the selected text (⇧⌘↩) — fast way to audition a sentence")
 
-                Button(state.lastAudio == nil ? "Generate" : "Re-generate") {
-                    player.stop()
-                    state.generate()
+                // Once audio exists, Re-generate lives in the player bar
+                // next to Play (#17); this bar keeps the first Generate.
+                if state.lastAudio == nil {
+                    Button("Generate") {
+                        player.stop()
+                        state.generate()
+                    }
+                    .prominentActionButtonStyle()
+                    .controlSize(.large)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!state.canGenerate)
+                    .help("Generate speech (⌘↩)")
                 }
-                .prominentActionButtonStyle()
-                .controlSize(.large)
-                .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!state.canGenerate)
-                .help("Generate speech (⌘↩)")
             }
         }
         .padding(.horizontal, 12)
@@ -302,7 +330,7 @@ struct EditorView: View {
 
     var body: some View {
         TextEditor(text: $state.script)
-            .font(.system(size: 14))
+            .font(.system(size: state.editorFontSize))
             .lineSpacing(4)
             .scrollContentBackground(.hidden)
             .editorWritingTools()
@@ -313,7 +341,7 @@ struct EditorView: View {
                 if state.script.isEmpty {
                     Text("Type or paste your script here…")
                         .foregroundStyle(.secondary)
-                        .font(.system(size: 14))
+                        .font(.system(size: state.editorFontSize))
                         .padding(.leading, 5)
                         .allowsHitTesting(false)
                 }

@@ -24,5 +24,10 @@ struct KokoroStudioApp: App {
                      destination: URL(string: "https://github.com/ntderosu-code/kokoro-studio/issues")!)
             }
         }
+
+        Settings {
+            SettingsView()
+                .environmentObject(state)
+        }
     }
 }

@@ -107,4 +107,27 @@ enum VoiceCatalog {
     static func voice(forID id: Int) -> Voice {
         all.indices.contains(id) ? all[id] : all[3]
     }
+
+    /// Picker groups honoring user favorites and hidden voices. Favorites
+    /// are pinned in their own first section (and removed from their home
+    /// group — Picker tags must be unique). Hidden voices disappear unless
+    /// currently selected, so the picker never shows a blank selection.
+    static func visibleGroups(favorites: Set<Int>, hidden: Set<Int>,
+                              selectedID: Int) -> [(label: String, voices: [Voice])] {
+        var groups: [(label: String, voices: [Voice])] = []
+        let favoriteVoices = all.filter { favorites.contains($0.id) }
+        if !favoriteVoices.isEmpty {
+            groups.append(("Favorites", favoriteVoices))
+        }
+        for group in grouped {
+            let voices = group.voices.filter { voice in
+                !favorites.contains(voice.id)
+                    && (!hidden.contains(voice.id) || voice.id == selectedID)
+            }
+            if !voices.isEmpty {
+                groups.append((group.label, voices))
+            }
+        }
+        return groups
+    }
 }

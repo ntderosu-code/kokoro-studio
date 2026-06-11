@@ -4,6 +4,7 @@ struct PlayerBar: View {
     @EnvironmentObject private var state: AppState
     @ObservedObject var player: PlayerController
     var onExport: () -> Void = {}
+    var onRegenerate: () -> Void = {}
 
     private func timeString(_ seconds: Double) -> String {
         let total = Int(seconds.rounded())
@@ -12,6 +13,14 @@ struct PlayerBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            Button("Re-generate") {
+                onRegenerate()
+            }
+            .prominentActionButtonStyle()
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(state.phase != .ready || !state.canGenerate)
+            .help("Generate speech again (⌘↩)")
+
             Button {
                 player.togglePlayPause()
             } label: {

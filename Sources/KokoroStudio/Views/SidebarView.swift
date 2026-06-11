@@ -66,7 +66,7 @@ struct SidebarView: View {
             Section("Voice") {
                 if state.engineKind == .kokoro {
                     Picker("Voice", selection: $state.voiceID) {
-                        ForEach(VoiceCatalog.grouped, id: \.label) { group in
+                        ForEach(state.visibleVoiceGroups, id: \.label) { group in
                             Section(group.label) {
                                 ForEach(group.voices) { voice in
                                     Text(voice.displayName).tag(voice.id)
@@ -75,7 +75,7 @@ struct SidebarView: View {
                         }
                     }
                     .labelsHidden()
-                    .help("★ = recommended starting points")
+                    .help("★ = recommended. Favorite or hide voices in Settings (⌘,)")
                     Button("Speakers…") {
                         showingSpeakers = true
                     }
@@ -226,8 +226,12 @@ struct SpeakersEditorView: View {
                             Picker("Voice", selection: Binding(
                                 get: { state.speakerVoices[name] ?? state.voiceID },
                                 set: { state.speakerVoices[name] = $0 })) {
-                                ForEach(VoiceCatalog.all) { voice in
-                                    Text(voice.displayName).tag(voice.id)
+                                ForEach(state.visibleVoiceGroups, id: \.label) { group in
+                                    Section(group.label) {
+                                        ForEach(group.voices) { voice in
+                                            Text(voice.displayName).tag(voice.id)
+                                        }
+                                    }
                                 }
                             }
                             LabeledContent("Speed") {

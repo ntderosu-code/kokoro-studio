@@ -106,6 +106,43 @@ final class AppState: ObservableObject {
         = DurationEstimator.defaultWordsPerSecond
     @AppStorage("leadInMs") var leadInMs = 0
     @AppStorage("leadOutMs") var leadOutMs = 0
+
+    // MARK: Preferences (Settings window)
+
+    @AppStorage("editorFontSize") var editorFontSize = 14.0
+    @AppStorage("autoplayAfterGenerate") var autoplayAfterGenerate = false
+    @AppStorage("revealInFinderAfterExport") var revealInFinderAfterExport = true
+    @AppStorage("timestampInFilenames") var timestampInFilenames = true
+    @AppStorage("favoriteVoiceIDs") private var favoriteVoiceIDsJSON = ""
+    @AppStorage("hiddenVoiceIDs") private var hiddenVoiceIDsJSON = ""
+
+    private func decodeIDs(_ json: String) -> Set<Int> {
+        guard let data = json.data(using: .utf8),
+              let ids = try? JSONDecoder().decode([Int].self, from: data)
+        else { return [] }
+        return Set(ids)
+    }
+
+    private func encodeIDs(_ ids: Set<Int>) -> String {
+        (try? JSONEncoder().encode(ids.sorted()))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    var favoriteVoiceIDs: Set<Int> {
+        get { decodeIDs(favoriteVoiceIDsJSON) }
+        set { favoriteVoiceIDsJSON = encodeIDs(newValue) }
+    }
+
+    var hiddenVoiceIDs: Set<Int> {
+        get { decodeIDs(hiddenVoiceIDsJSON) }
+        set { hiddenVoiceIDsJSON = encodeIDs(newValue) }
+    }
+
+    var visibleVoiceGroups: [(label: String, voices: [Voice])] {
+        VoiceCatalog.visibleGroups(favorites: favoriteVoiceIDs,
+                                   hidden: hiddenVoiceIDs,
+                                   selectedID: voiceID)
+    }
     @AppStorage("captionFormat") private var captionFormatRaw = CaptionFormat.off.rawValue
 
     var captionFormat: CaptionFormat {
@@ -460,7 +497,7 @@ final class AppState: ObservableObject {
                 await MainActor.run {
                     self.phase = .ready
                     self.currentCancellation = nil
-                    if let first = exported.first {
+                    if self.revealInFinderAfterExport, let first = exported.first {
                         NSWorkspace.shared.activateFileViewerSelecting([first])
                     }
                 }
@@ -543,7 +580,8 @@ final class AppState: ObservableObject {
         } else {
             return
         }
-        let filename = AudioExporter.defaultFilename(for: script)
+        let filename = AudioExporter.defaultFilename(
+            for: script, includeTimestamp: timestampInFilenames)
         let destination = folder.appendingPathComponent(filename)
             .appendingPathExtension(exportFormat.fileExtension)
         do {
@@ -567,7 +605,9 @@ final class AppState: ObservableObject {
                 try captionText.write(to: captionURL, atomically: true,
                                       encoding: .utf8)
             }
-            NSWorkspace.shared.activateFileViewerSelecting([destination])
+            if revealInFinderAfterExport {
+                NSWorkspace.shared.activateFileViewerSelecting([destination])
+            }
         } catch {
             errorMessage = "Export failed: \(error.localizedDescription)"
         }

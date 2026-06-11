@@ -45,9 +45,13 @@ enum AudioExporter {
     }
 
     /// "Hello, world! This is..." -> "Hello-world-This-is-<timestamp>"
-    static func defaultFilename(for script: String) -> String {
+    static func defaultFilename(for script: String,
+                                includeTimestamp: Bool = true) -> String {
         let words = script.split { !$0.isLetter && !$0.isNumber }.prefix(5)
         let stem = words.joined(separator: "-")
+        guard includeTimestamp else {
+            return stem.isEmpty ? "kokoro" : stem
+        }
         let timestamp = ISO8601DateFormatter().string(from: Date())
             .replacingOccurrences(of: ":", with: "")
         return stem.isEmpty ? "kokoro-\(timestamp)" : "\(stem)-\(timestamp)"
