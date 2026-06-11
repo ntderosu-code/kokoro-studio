@@ -4,6 +4,12 @@ import SwiftUI
 // Glass is applied only to the floating-controls layer (action bar, player
 // bar) per HIG — content surfaces and the settings form stay standard.
 
+/// One corner radius for the floating bars and the editor card, so the
+/// layered surfaces read as one design system.
+enum GlassMetrics {
+    static let cornerRadius: CGFloat = 14
+}
+
 extension View {
     /// Opts the editor into full inline Apple Intelligence Writing Tools
     /// where available; no-op on older systems.
@@ -17,8 +23,11 @@ extension View {
     }
 
     /// Floating-bar chrome: Liquid Glass on macOS 26+, material card below.
+    /// Controls inside these bars use plain bordered styles — glass
+    /// buttons on a glass surface would layer Liquid Glass on Liquid
+    /// Glass, which the HIG warns against.
     @ViewBuilder
-    func barGlass(cornerRadius: CGFloat = 14) -> some View {
+    func barGlass(cornerRadius: CGFloat = GlassMetrics.cornerRadius) -> some View {
         if #available(macOS 26.0, *) {
             self.glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
         } else {
@@ -30,23 +39,15 @@ extension View {
         }
     }
 
-    /// Primary-action button: glassProminent on 26+, borderedProminent below.
+    /// Identity for glass morphing: when one bar leaves the hierarchy and
+    /// another arrives inside the same BarGlassContainer, the system
+    /// morphs between them instead of cross-fading. No-op before 26.
     @ViewBuilder
-    func prominentActionButtonStyle() -> some View {
+    func barGlassID(_ id: String, in namespace: Namespace.ID) -> some View {
         if #available(macOS 26.0, *) {
-            self.buttonStyle(.glassProminent)
+            self.glassEffectID(id, in: namespace)
         } else {
-            self.buttonStyle(.borderedProminent)
-        }
-    }
-
-    /// Secondary-action button: glass on 26+, bordered below.
-    @ViewBuilder
-    func secondaryActionButtonStyle() -> some View {
-        if #available(macOS 26.0, *) {
-            self.buttonStyle(.glass)
-        } else {
-            self.buttonStyle(.bordered)
+            self
         }
     }
 }

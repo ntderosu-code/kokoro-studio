@@ -40,7 +40,7 @@ struct PlayerBar: View {
             Button("Re-generate") {
                 onRegenerate()
             }
-            .prominentActionButtonStyle()
+            .buttonStyle(.borderedProminent)
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(state.phase != .ready || !state.canGenerate)
             .help("Generate speech again (⌘↩)")
@@ -50,7 +50,7 @@ struct PlayerBar: View {
                     player.stop()
                     state.patchRegenerate()
                 }
-                .secondaryActionButtonStyle()
+                .buttonStyle(.bordered)
                 .keyboardShortcut(.return, modifiers: [.command, .option])
                 .help("Re-render only the edited lines and splice them into the existing audio (⌥⌘↩)")
             }
@@ -90,7 +90,7 @@ struct PlayerBar: View {
             Button("Export", systemImage: "square.and.arrow.up") {
                 onExport()
             }
-            .secondaryActionButtonStyle()
+            .buttonStyle(.bordered)
             .disabled(state.lastAudio?.isPreview == true)
             .help(state.lastAudio?.isPreview == true
                   ? "Previews can't be exported — Re-generate the full script first"

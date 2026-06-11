@@ -9,6 +9,7 @@ struct ContentView: View {
     @EnvironmentObject private var state: AppState
     @StateObject private var player = PlayerController()
     @StateObject private var highlighter = FollowAlongHighlighter()
+    @Namespace private var glassNamespace
     @State private var quickAddWord: String?
     @State private var showingLinter = false
     @State private var hasEditorSelection = false
@@ -91,12 +92,14 @@ struct ContentView: View {
                                               state.generate()
                                           })
                                     .barGlass()
+                                    .barGlassID("player-bar", in: glassNamespace)
                             }
                             // Only present while it has content: the first
                             // Generate, or status/Stop during generation.
                             if state.lastAudio == nil || state.isGenerating {
                                 actionBar
                                     .barGlass()
+                                    .barGlassID("action-bar", in: glassNamespace)
                             }
                         }
                         .padding(.horizontal, 28)
@@ -377,7 +380,7 @@ struct ContentView: View {
                 Button("Stop") {
                     state.cancelGeneration()
                 }
-                .secondaryActionButtonStyle()
+                .buttonStyle(.bordered)
                 .controlSize(.large)
                 .help("Stop generation")
             } else {
@@ -388,7 +391,7 @@ struct ContentView: View {
                         player.stop()
                         state.generate()
                     }
-                    .prominentActionButtonStyle()
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(!state.canGenerate)
@@ -447,9 +450,9 @@ struct EditorView: View {
             // Keep the last lines reachable above the floating glass bars.
             .contentMargins(.bottom, 120, for: .scrollContent)
         .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: GlassMetrics.cornerRadius))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: GlassMetrics.cornerRadius)
                 .strokeBorder(.quaternary)
         )
         .shadow(color: .black.opacity(0.10), radius: 10, y: 2)
