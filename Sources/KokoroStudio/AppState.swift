@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import AVFoundation
+import Combine
 
 /// Clears preview state when a voice sample finishes playing.
 final class VoicePreviewDelegate: NSObject, AVAudioPlayerDelegate {
@@ -262,6 +263,124 @@ final class AppState: ObservableObject {
         voicePreviewPlayer = player
         previewingVoiceID = voiceID
         player.play()
+    }
+
+    // MARK: - Script library (#34)
+
+    @Published var documents: [ScriptDocumentMeta] = []
+    @AppStorage("currentDocumentID") private var currentDocumentIDRaw = ""
+    /// The active settings profile, shared with document metadata so each
+    /// script remembers its sound. Previously view-local in ContentView.
+    @AppStorage("currentProfileName") var currentProfileName = ""
+    private var autosaveCancellable: AnyCancellable?
+
+    var currentDocumentID: UUID? {
+        get { UUID(uuidString: currentDocumentIDRaw) }
+        set { currentDocumentIDRaw = newValue?.uuidString ?? "" }
+    }
+
+    /// Call once at launch, after sample-script seeding so a first run's
+    /// sample becomes the first library item.
+    func loadLibrary() {
+        documents = DocumentStore.list()
+        if documents.isEmpty {
+            createDocument(text: script)
+        } else if let id = currentDocumentID,
+                  documents.contains(where: { $0.id == id }) {
+            script = DocumentStore.loadText(id: id)
+        } else {
+            selectDocument(documents[0].id)
+        }
+        startAutosave()
+
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil,
+            queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.saveCurrentDocumentNow() }
+        }
+    }
+
+    private func startAutosave() {
+        autosaveCancellable = $script
+            .dropFirst()
+            .debounce(for: .seconds(1), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.saveCurrentDocumentNow() }
+    }
+
+    func saveCurrentDocumentNow() {
+        guard let id = currentDocumentID,
+              var meta = documents.first(where: { $0.id == id }) else { return }
+        if !meta.customTitle {
+            meta.title = ScriptDocumentMeta.autoTitle(for: script)
+        }
+        meta.profileName = currentProfileName.isEmpty ? nil : currentProfileName
+        meta.updatedAt = Date()
+        try? DocumentStore.save(meta: meta, text: script)
+        if let index = documents.firstIndex(where: { $0.id == id }) {
+            documents[index] = meta
+        }
+    }
+
+    func selectDocument(_ id: UUID) {
+        guard id != currentDocumentID else { return }
+        saveCurrentDocumentNow()
+        guard let meta = documents.first(where: { $0.id == id }) else { return }
+        currentDocumentID = id
+        script = DocumentStore.loadText(id: id)
+        // Switching scripts drops the old script's audio; regenerating is
+        // cheap and a stale player invites exporting the wrong lesson.
+        lastAudio = nil
+        if let profileName = meta.profileName,
+           let profile = ProfileStore.load(name: profileName) {
+            currentProfileName = profileName
+            apply(profile)
+        }
+    }
+
+    @discardableResult
+    func createDocument(text: String = "") -> ScriptDocumentMeta {
+        saveCurrentDocumentNow()
+        var meta = ScriptDocumentMeta(title: ScriptDocumentMeta.autoTitle(for: text))
+        meta.profileName = currentProfileName.isEmpty ? nil : currentProfileName
+        try? DocumentStore.save(meta: meta, text: text)
+        documents.insert(meta, at: 0)
+        currentDocumentID = meta.id
+        script = text
+        lastAudio = nil
+        return meta
+    }
+
+    func renameDocument(_ id: UUID, to newTitle: String) {
+        guard var meta = documents.first(where: { $0.id == id }) else { return }
+        let trimmed = newTitle.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        meta.title = trimmed
+        meta.customTitle = true
+        meta.updatedAt = Date()
+        try? DocumentStore.saveMeta(meta)
+        if let index = documents.firstIndex(where: { $0.id == id }) {
+            documents[index] = meta
+        }
+    }
+
+    func duplicateDocument(_ id: UUID) {
+        saveCurrentDocumentNow()
+        guard let copy = DocumentStore.duplicate(id: id) else { return }
+        documents.insert(copy, at: 0)
+    }
+
+    /// Removes the library entry only — exported audio is never touched.
+    func deleteDocument(_ id: UUID) {
+        DocumentStore.delete(id: id)
+        documents.removeAll { $0.id == id }
+        if currentDocumentID == id {
+            if let next = documents.first {
+                currentDocumentID = nil // force reload in selectDocument
+                selectDocument(next.id)
+            } else {
+                createDocument()
+            }
+        }
     }
 
     // MARK: - Document import (#33)

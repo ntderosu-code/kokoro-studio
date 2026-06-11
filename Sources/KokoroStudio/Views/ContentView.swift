@@ -21,7 +21,6 @@ struct ContentView: View {
     @State private var showingSaveProfile = false
     @State private var newProfileName = ""
     @State private var profileNames = ProfileStore.list()
-    @State private var selectedProfile = ""
 
     /// Reads the current selection from the focused text view (the script
     /// editor). SwiftUI's TextEditor exposes no selection binding on macOS,
@@ -115,7 +114,7 @@ struct ContentView: View {
         .toolbar(id: "main") {
             ToolbarItem(id: "profile", placement: .navigation) {
                 Menu {
-                    Picker("Profile", selection: $selectedProfile) {
+                    Picker("Profile", selection: $state.currentProfileName) {
                         Text("Custom").tag("")
                         ForEach(profileNames, id: \.self) { name in
                             Text(name).tag(name)
@@ -124,22 +123,24 @@ struct ContentView: View {
                     .pickerStyle(.inline)
                     Divider()
                     Button("Save Current As…") {
-                        newProfileName = selectedProfile
+                        newProfileName = state.currentProfileName
                         showingSaveProfile = true
                     }
-                    if !selectedProfile.isEmpty {
-                        Button("Delete \"\(selectedProfile)\"", role: .destructive) {
-                            ProfileStore.delete(name: selectedProfile)
+                    if !state.currentProfileName.isEmpty {
+                        Button("Delete \"\(state.currentProfileName)\"",
+                               role: .destructive) {
+                            ProfileStore.delete(name: state.currentProfileName)
                             profileNames = ProfileStore.list()
-                            selectedProfile = ""
+                            state.currentProfileName = ""
                         }
                     }
                 } label: {
-                    Label(selectedProfile.isEmpty ? "Profile" : selectedProfile,
+                    Label(state.currentProfileName.isEmpty
+                          ? "Profile" : state.currentProfileName,
                           systemImage: "square.stack")
                 }
                 .help("Apply, save, or delete settings profiles")
-                .onChange(of: selectedProfile) { _, name in
+                .onChange(of: state.currentProfileName) { _, name in
                     if !name.isEmpty, let profile = ProfileStore.load(name: name) {
                         state.apply(profile)
                     }
@@ -225,7 +226,7 @@ struct ContentView: View {
                 guard !name.isEmpty else { return }
                 try? ProfileStore.save(state.currentProfile(), name: name)
                 profileNames = ProfileStore.list()
-                selectedProfile = name
+                state.currentProfileName = name
             }
             Button("Cancel", role: .cancel) {}
         } message: {

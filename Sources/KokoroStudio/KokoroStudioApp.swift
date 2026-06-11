@@ -33,6 +33,7 @@ struct KokoroStudioApp: App {
                 .task {
                     state.loadModel()
                     state.seedSampleScriptIfFirstRun()
+                    state.loadLibrary()
                 }
         }
         .defaultSize(width: 940, height: 620)
