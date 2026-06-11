@@ -123,6 +123,19 @@ struct ContentView: View {
             }
 
             ToolbarItemGroup {
+                Button("Preview Selection", systemImage: "play.circle") {
+                    if let selection = selectedEditorText() {
+                        player.stop()
+                        state.generate(textOverride: selection)
+                    } else {
+                        state.errorMessage =
+                            "Select part of the script first — Preview generates just the selection."
+                    }
+                }
+                .keyboardShortcut(.return, modifiers: [.command, .shift])
+                .disabled(state.phase != .ready)
+                .help("Generate only the selected text (⇧⌘↩)")
+
                 Button("Find & Replace", systemImage: "magnifyingglass") {
                     showFindAndReplace()
                 }
@@ -270,20 +283,6 @@ struct ContentView: View {
                 .controlSize(.large)
                 .help("Stop generation")
             } else {
-                Button("Preview Selection") {
-                    if let selection = selectedEditorText() {
-                        player.stop()
-                        state.generate(textOverride: selection)
-                    } else {
-                        state.errorMessage =
-                            "Select part of the script first — Preview generates just the selection."
-                    }
-                }
-                .secondaryActionButtonStyle()
-                .keyboardShortcut(.return, modifiers: [.command, .shift])
-                .disabled(state.phase != .ready)
-                .help("Generate only the selected text (⇧⌘↩) — fast way to audition a sentence")
-
                 // Once audio exists, Re-generate lives in the player bar
                 // next to Play (#17); this bar keeps the first Generate.
                 if state.lastAudio == nil {
