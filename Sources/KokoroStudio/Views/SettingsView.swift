@@ -8,6 +8,8 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
             VoicesSettingsTab()
                 .tabItem { Label("Voices", systemImage: "person.wave.2") }
+            DictionarySettingsTab()
+                .tabItem { Label("Dictionary", systemImage: "character.book.closed") }
         }
         .frame(width: 480, height: 420)
     }
@@ -56,6 +58,47 @@ struct GeneralSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+struct DictionarySettingsTab: View {
+    @EnvironmentObject private var state: AppState
+
+    private var ruleCount: Int {
+        PronunciationDictionary.parse(state.pronunciationRulesText).count
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("One rule per line. Applied to whole words, ignoring case, " +
+                     "before synthesis. Lines starting with # are comments.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("""
+                kokoro = koh koh roh      (respell)
+                APA = @letters            (spell out: A-P-A)
+                NASA = @word              (say as written)
+                IEP = @letters-first      (spell out first use only)
+                """)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+            .padding(12)
+
+            Divider()
+
+            TextEditor(text: $state.pronunciationRulesText)
+                .font(.body.monospaced())
+                .padding(8)
+
+            Divider()
+
+            Text("\(ruleCount) rule\(ruleCount == 1 ? "" : "s") active")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(8)
+        }
     }
 }
 

@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var quickAddWord: String?
     @State private var showingSyntaxHelp = false
     @State private var showingLinter = false
+    @State private var hasEditorSelection = false
 
     private var pronunciationSuspects: [String] {
         ScriptLinter.acronymSuspects(
@@ -131,14 +132,13 @@ struct ContentView: View {
                     if let selection = selectedEditorText() {
                         player.stop()
                         state.generate(textOverride: selection)
-                    } else {
-                        state.errorMessage =
-                            "Select part of the script first — Preview generates just the selection."
                     }
                 }
                 .keyboardShortcut(.return, modifiers: [.command, .shift])
-                .disabled(state.phase != .ready)
-                .help("Generate only the selected text (⇧⌘↩)")
+                .disabled(state.phase != .ready || !hasEditorSelection)
+                .help(hasEditorSelection
+                      ? "Generate only the selected text (⇧⌘↩)"
+                      : "Select part of the script to preview it (⇧⌘↩)")
 
                 Button("Find & Replace", systemImage: "magnifyingglass") {
                     showFindAndReplace()
@@ -162,13 +162,13 @@ struct ContentView: View {
                 Button("Add to Dictionary", systemImage: "character.book.closed") {
                     if let selection = selectedEditorText() {
                         quickAddWord = selection
-                    } else {
-                        state.errorMessage =
-                            "Select a word or phrase in the editor first, then press ⌘D."
                     }
                 }
                 .keyboardShortcut("d", modifiers: .command)
-                .help("Add selected word to pronunciation dictionary (⌘D)")
+                .disabled(!hasEditorSelection)
+                .help(hasEditorSelection
+                      ? "Add selected word to pronunciation dictionary (⌘D)"
+                      : "Select a word to add it to the dictionary (⌘D)")
 
                 Button("Script Syntax", systemImage: "questionmark.circle") {
                     showingSyntaxHelp = true
@@ -205,6 +205,10 @@ struct ContentView: View {
             set: { quickAddWord = $0?.word })) { target in
             QuickAddDictionaryView(word: target.word,
                                    rulesText: $state.pronunciationRulesText)
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSTextView.didChangeSelectionNotification)) { _ in
+            hasEditorSelection = selectedEditorText() != nil
         }
         .onChange(of: state.lastAudio?.previewWAV) { _, url in
             if let url {
