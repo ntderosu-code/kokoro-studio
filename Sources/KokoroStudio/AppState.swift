@@ -264,6 +264,147 @@ final class AppState: ObservableObject {
         player.play()
     }
 
+    // MARK: - A/B voice audition (#32)
+
+    /// Non-nil presents the Compare Voices sheet with this text.
+    @Published var auditionText: String?
+    @Published var auditionRendering: AuditionVoice?
+    @Published var auditionPlaying: AuditionVoice?
+    private var auditionPlayer: AVAudioPlayer?
+    private let auditionPlayerDelegate = VoicePreviewDelegate()
+    /// Session cache: cacheKey -> rendered WAV in the temp directory, so
+    /// replaying and switching sides is instant.
+    private var auditionCache: [String: URL] = [:]
+
+    func toggleAudition(text: String, voice: AuditionVoice) {
+        if auditionPlaying == voice {
+            auditionPlayer?.stop()
+            auditionPlaying = nil
+            return
+        }
+        auditionPlayer?.stop()
+        auditionPlaying = nil
+
+        let key = AuditionSupport.cacheKey(text: text,
+                                           voiceLabel: voice.cacheLabel)
+        if let url = auditionCache[key] {
+            playAudition(from: url, voice: voice)
+            return
+        }
+        guard auditionRendering == nil, !isGenerating else { return }
+
+        // Same text pipeline as Generate so the comparison is honest.
+        let rules = PronunciationDictionary.parse(pronunciationRulesText)
+        var processed = InlineOverrides.apply(to: text)
+        processed = PronunciationDictionary.apply(rules, to: processed)
+        processed = NumberNormalizer.normalize(processed, preset: numberPreset)
+
+        auditionRendering = voice
+        let speedValue = Float(speed)
+
+        switch voice {
+        case .kokoro(let voiceID):
+            guard let engine else {
+                auditionRendering = nil
+                return
+            }
+            Task.detached(priority: .userInitiated) {
+                let samples = engine.synthesize(text: processed,
+                                                voiceID: voiceID,
+                                                speed: speedValue,
+                                                progress: { _ in true })
+                await MainActor.run {
+                    self.finishAuditionRender(samples: samples,
+                                              sampleRate: engine.sampleRate,
+                                              key: key, voice: voice)
+                }
+            }
+        case .pocket:
+            let referenceURL = pocketVoiceURL
+            let cachedPocketEngine = pocketEngine
+            Task.detached(priority: .userInitiated) {
+                do {
+                    let pocket: PocketEngine
+                    if let cachedPocketEngine {
+                        pocket = cachedPocketEngine
+                    } else {
+                        guard let directory = AppState.locatePocketDirectory() else {
+                            throw KokoroEngineError.modelLoadFailed(
+                                "Pocket TTS model folder not found in the app bundle")
+                        }
+                        pocket = try PocketEngine(modelDirectory: directory)
+                        await MainActor.run { self.pocketEngine = pocket }
+                    }
+                    guard let referenceURL else {
+                        throw KokoroEngineError.modelLoadFailed(
+                            "no voice sample selected for Pocket TTS")
+                    }
+                    let reference = try ReferenceAudioLoader.load(url: referenceURL)
+                    let samples = pocket.synthesize(
+                        text: processed,
+                        referenceAudio: reference.samples,
+                        referenceSampleRate: reference.sampleRate,
+                        speed: speedValue, progress: { _ in true })
+                    await MainActor.run {
+                        self.finishAuditionRender(samples: samples,
+                                                  sampleRate: pocket.sampleRate,
+                                                  key: key, voice: voice)
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.auditionRendering = nil
+                        self.errorMessage = error.localizedDescription
+                    }
+                }
+            }
+        }
+    }
+
+    private func finishAuditionRender(samples: [Float], sampleRate: Int,
+                                      key: String, voice: AuditionVoice) {
+        auditionRendering = nil
+        guard !samples.isEmpty else { return }
+        do {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("kokoro-audition-\(key)")
+                .appendingPathExtension("wav")
+            try AudioExporter.write(
+                samples: AudioProcessing.normalizePeak(samples),
+                sampleRate: sampleRate, to: url, format: .wav)
+            auditionCache[key] = url
+            playAudition(from: url, voice: voice)
+        } catch {
+            errorMessage = "Could not render audition: \(error.localizedDescription)"
+        }
+    }
+
+    private func playAudition(from url: URL, voice: AuditionVoice) {
+        guard let player = try? AVAudioPlayer(contentsOf: url) else { return }
+        auditionPlayerDelegate.onFinish = { [weak self] in
+            self?.auditionPlaying = nil
+        }
+        player.delegate = auditionPlayerDelegate
+        auditionPlayer = player
+        auditionPlaying = voice
+        player.play()
+    }
+
+    /// "Use This Voice" — adopts the audition side as the script's voice.
+    func useAuditionVoice(_ voice: AuditionVoice) {
+        switch voice {
+        case .kokoro(let id):
+            engineKind = .kokoro
+            voiceID = id
+        case .pocket:
+            engineKind = .pocket
+        }
+    }
+
+    func stopAudition() {
+        auditionPlayer?.stop()
+        auditionPlaying = nil
+    }
+
     // MARK: - Sample script (#31)
 
     @AppStorage("hasSeededSampleScript") private var hasSeededSampleScript = false
