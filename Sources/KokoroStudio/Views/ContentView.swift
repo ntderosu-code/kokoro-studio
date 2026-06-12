@@ -489,6 +489,22 @@ struct EditorView: View {
         // Gutter refresh happens via the script change driving SpeakerGutterHost.
     }
 
+    /// Persists a new speaker's voice and visual identity, then tags the
+    /// paragraph with it.
+    private func createSpeaker(name: String, voiceID: Int,
+                               colorIndex: Int, symbolIndex: Int,
+                               forParagraph index: Int) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed != SpeakerIdentity.narratorName else { return }
+        var voices = state.speakerVoices; voices[trimmed] = voiceID
+        state.speakerVoices = voices
+        var colors = state.speakerColors; colors[trimmed] = colorIndex
+        state.speakerColors = colors
+        var symbols = state.speakerSymbols; symbols[trimmed] = symbolIndex
+        state.speakerSymbols = symbols
+        assignSpeaker(trimmed, toParagraph: index)
+    }
+
     private struct PickerTarget: Identifiable { let id: Int }
 
     var body: some View {
@@ -508,11 +524,19 @@ struct EditorView: View {
                             currentSpeaker: currentSpeaker(forParagraph: target.id),
                             colorOverrides: state.speakerColors,
                             symbolOverrides: state.speakerSymbols,
+                            voiceGroups: state.visibleVoiceGroups,
+                            defaultVoiceID: state.voiceID,
                             onPick: { name in
                                 assignSpeaker(name, toParagraph: target.id)
                                 pendingPickerParagraph = nil
                             },
-                            onNew: {})
+                            onCreate: { name, voiceID, colorIndex, symbolIndex in
+                                createSpeaker(name: name, voiceID: voiceID,
+                                              colorIndex: colorIndex,
+                                              symbolIndex: symbolIndex,
+                                              forParagraph: target.id)
+                                pendingPickerParagraph = nil
+                            })
                     }
             }
             editorCore
