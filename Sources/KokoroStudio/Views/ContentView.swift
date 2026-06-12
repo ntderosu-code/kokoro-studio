@@ -255,14 +255,32 @@ struct ContentView: View {
 
             // Output action anchors the trailing edge
             ToolbarItem(id: "export") {
-                Button("Export", systemImage: "square.and.arrow.up") {
+                // The menu stays enabled even when the current script has no
+                // exportable audio — batch export must remain reachable — so
+                // the primary action guards instead of using .disabled.
+                Menu {
+                    Button("Batch Export…", systemImage: "square.stack.3d.up") {
+                        state.showingBatchSheet = true
+                    }
+                    .disabled(state.phase != .ready && !state.batchRunning)
+                    Button("Export Open Tabs",
+                           systemImage: "square.and.arrow.up.on.square") {
+                        state.saveCurrentDocumentNow()
+                        state.startBatch(documentIDs: state.openTabIDs)
+                        state.showingBatchSheet = true
+                    }
+                    .disabled(state.phase != .ready || state.openTabIDs.isEmpty)
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                } primaryAction: {
+                    guard state.lastAudio != nil,
+                          state.lastAudio?.isPreview != true else { return }
                     showingExportSheet = true
                 }
                 .keyboardShortcut("s", modifiers: .command)
-                .disabled(state.lastAudio == nil || state.lastAudio?.isPreview == true)
-                .help(state.lastAudio?.isPreview == true
-                      ? "Previews can't be exported — Re-generate the full script first"
-                      : "Export audio and captions (⌘S)")
+                .help(state.lastAudio == nil || state.lastAudio?.isPreview == true
+                      ? "Generate audio first to export — or open the menu for batch export"
+                      : "Export audio and captions (⌘S); batch options in the menu")
             }
         }
         .sheet(isPresented: $showingExportSheet) {

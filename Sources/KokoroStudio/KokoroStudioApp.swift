@@ -52,6 +52,20 @@ struct KokoroStudioApp: App {
                 }
             }
             CommandGroup(after: .newItem) {
+                Button("New Script") {
+                    state.createDocument()
+                }
+                .keyboardShortcut("t", modifiers: .command)
+                Button("Close Tab") {
+                    if let id = state.currentDocumentID { state.closeTab(id) }
+                }
+                .keyboardShortcut("w", modifiers: [.command, .shift])
+                Divider()
+                Button("Show Next Tab") { state.nextTab() }
+                    .keyboardShortcut(.tab, modifiers: .control)
+                Button("Show Previous Tab") { state.previousTab() }
+                    .keyboardShortcut(.tab, modifiers: [.control, .shift])
+                Divider()
                 Button("Import Document…") {
                     state.showingImportPanel = true
                 }
