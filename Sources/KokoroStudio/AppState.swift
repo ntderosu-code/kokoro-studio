@@ -320,6 +320,61 @@ final class AppState: ObservableObject {
         set { currentDocumentIDRaw = newValue?.uuidString ?? "" }
     }
 
+    @AppStorage("openTabIDs") private var openTabIDsJSON = ""
+
+    /// Open script tabs, in display order. Persisted across launches.
+    var openTabIDs: [UUID] {
+        get {
+            guard let data = openTabIDsJSON.data(using: .utf8),
+                  let strings = try? JSONDecoder().decode([String].self, from: data)
+            else { return [] }
+            return strings.compactMap(UUID.init(uuidString:))
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue.map(\.uuidString)) {
+                openTabIDsJSON = String(data: data, encoding: .utf8) ?? ""
+            }
+        }
+    }
+
+    private var tabState: ScriptTabs.State {
+        ScriptTabs.State(openIDs: openTabIDs, activeID: currentDocumentID)
+    }
+
+    /// Applies a ScriptTabs transition result: persists the open set and
+    /// switches documents if the active tab changed.
+    private func applyTabState(_ state: ScriptTabs.State) {
+        openTabIDs = state.openIDs
+        if let active = state.activeID, active != currentDocumentID {
+            selectDocument(active)
+        } else if state.activeID == nil {
+            createDocument()
+        }
+    }
+
+    func openTab(_ id: UUID) {
+        applyTabState(ScriptTabs.open(id, in: tabState))
+    }
+
+    func closeTab(_ id: UUID) {
+        applyTabState(ScriptTabs.close(id, in: tabState,
+                                       library: documents.map(\.id)))
+    }
+
+    func closeOtherTabs(keeping id: UUID) {
+        applyTabState(ScriptTabs.closeOthers(keeping: id, in: tabState))
+    }
+
+    func nextTab() { cycleTab(by: 1) }
+    func previousTab() { cycleTab(by: -1) }
+
+    private func cycleTab(by offset: Int) {
+        let ids = openTabIDs
+        guard ids.count > 1, let current = currentDocumentID,
+              let index = ids.firstIndex(of: current) else { return }
+        selectDocument(ids[(index + offset + ids.count) % ids.count])
+    }
+
     /// Call once at launch, after sample-script seeding so a first run's
     /// sample becomes the first library item.
     func loadLibrary() {
@@ -332,6 +387,7 @@ final class AppState: ObservableObject {
         } else {
             selectDocument(documents[0].id)
         }
+        applyTabState(ScriptTabs.reconcile(tabState, library: documents.map(\.id)))
         startAutosave()
 
         NotificationCenter.default.addObserver(
@@ -386,6 +442,7 @@ final class AppState: ObservableObject {
         try? DocumentStore.save(meta: meta, text: text)
         documents.insert(meta, at: 0)
         currentDocumentID = meta.id
+        openTabIDs = ScriptTabs.open(meta.id, in: tabState).openIDs
         script = text
         lastAudio = nil
         return meta
@@ -408,20 +465,19 @@ final class AppState: ObservableObject {
         saveCurrentDocumentNow()
         guard let copy = DocumentStore.duplicate(id: id) else { return }
         documents.insert(copy, at: 0)
+        openTab(copy.id)
     }
 
     /// Removes the library entry only — exported audio is never touched.
     func deleteDocument(_ id: UUID) {
+        let next = ScriptTabs.close(id, in: tabState,
+                                    library: documents.map(\.id))
         DocumentStore.delete(id: id)
         documents.removeAll { $0.id == id }
         if currentDocumentID == id {
-            if let next = documents.first {
-                currentDocumentID = nil // force reload in selectDocument
-                selectDocument(next.id)
-            } else {
-                createDocument()
-            }
+            currentDocumentID = nil // force reload in selectDocument
         }
+        applyTabState(next)
     }
 
     // MARK: - Document import (#33)
