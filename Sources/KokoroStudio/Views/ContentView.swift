@@ -78,6 +78,8 @@ struct ContentView: View {
 
     private var editorPane: some View {
         VStack(spacing: 6) {
+            VStack(spacing: 0) {
+            ScriptTabBar()
             EditorView()
                 // Glass floats over the page so the script scrolls beneath
                 // it — that gives Liquid Glass something to refract.
@@ -108,6 +110,7 @@ struct ContentView: View {
                     .animation(.spring(duration: 0.35),
                                value: state.lastAudio?.previewWAV)
                 }
+            }
             scriptInfoRow
         }
             .padding(.horizontal, 14)
@@ -542,9 +545,14 @@ struct EditorView: View {
             editorCore
         }
         .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: GlassMetrics.cornerRadius))
+        // Top corners are square so the tab strip fuses to the card.
+        .clipShape(UnevenRoundedRectangle(
+            bottomLeadingRadius: GlassMetrics.cornerRadius,
+            bottomTrailingRadius: GlassMetrics.cornerRadius))
         .overlay(
-            RoundedRectangle(cornerRadius: GlassMetrics.cornerRadius)
+            UnevenRoundedRectangle(
+                bottomLeadingRadius: GlassMetrics.cornerRadius,
+                bottomTrailingRadius: GlassMetrics.cornerRadius)
                 .strokeBorder(.quaternary)
         )
         .shadow(color: .black.opacity(0.10), radius: 10, y: 2)
