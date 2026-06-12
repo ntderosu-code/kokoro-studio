@@ -37,7 +37,7 @@
 - Create: `Sources/KokoroStudio/ScriptTabs.swift`
 - Test: `Tests/KokoroStudioTests/ScriptTabsTests.swift`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `Tests/KokoroStudioTests/ScriptTabsTests.swift`:
 
@@ -105,12 +105,12 @@ final class ScriptTabsTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter ScriptTabsTests`
 Expected: FAIL — `cannot find 'ScriptTabs' in scope`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `Sources/KokoroStudio/ScriptTabs.swift`:
 
@@ -170,12 +170,12 @@ enum ScriptTabs {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter ScriptTabsTests`
 Expected: PASS (9 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/KokoroStudio/ScriptTabs.swift Tests/KokoroStudioTests/ScriptTabsTests.swift
@@ -189,7 +189,7 @@ git commit -m "feat: ScriptTabs pure open/close/reconcile transitions"
 **Files:**
 - Modify: `Sources/KokoroStudio/AppState.swift` (library section, ~lines 309–425)
 
-- [ ] **Step 1: Add persisted open-tab storage**
+- [x] **Step 1: Add persisted open-tab storage**
 
 Below `currentDocumentID` (ends ~line 321), add:
 
@@ -227,7 +227,7 @@ Below `currentDocumentID` (ends ~line 321), add:
     }
 ```
 
-- [ ] **Step 2: Add the tab actions**
+- [x] **Step 2: Add the tab actions**
 
 After `applyTabState`, add:
 
@@ -256,7 +256,7 @@ After `applyTabState`, add:
     }
 ```
 
-- [ ] **Step 3: Reconcile at launch**
+- [x] **Step 3: Reconcile at launch**
 
 In `loadLibrary()`, after the existing `if/else` chain (after line 334, before `startAutosave()`), add:
 
@@ -264,7 +264,7 @@ In `loadLibrary()`, after the existing `if/else` chain (after line 334, before `
         applyTabState(ScriptTabs.reconcile(tabState, library: documents.map(\.id)))
 ```
 
-- [ ] **Step 4: Tab upkeep in document CRUD**
+- [x] **Step 4: Tab upkeep in document CRUD**
 
 In `createDocument`, after `currentDocumentID = meta.id` add:
 
@@ -297,12 +297,12 @@ Replace the body of `deleteDocument` with:
 (`ScriptTabs.close`'s library fallback already excludes the closed id, so the
 deleted document can't be re-selected.)
 
-- [ ] **Step 5: Build and run full test suite**
+- [x] **Step 5: Build and run full test suite**
 
 Run: `swift build && DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test`
 Expected: builds; all tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/KokoroStudio/AppState.swift
@@ -317,7 +317,7 @@ git commit -m "feat: AppState open-tab persistence and tab actions"
 - Create: `Sources/KokoroStudio/Views/ScriptTabBar.swift`
 - Modify: `Sources/KokoroStudio/Views/ContentView.swift` (`editorPane`, ~line 79)
 
-- [ ] **Step 1: Create the tab bar view**
+- [x] **Step 1: Create the tab bar view**
 
 Create `Sources/KokoroStudio/Views/ScriptTabBar.swift`:
 
@@ -439,7 +439,7 @@ struct ScriptTabBar: View {
 }
 ```
 
-- [ ] **Step 2: Host it above the editor and square the card's top corners**
+- [x] **Step 2: Host it above the editor and square the card's top corners**
 
 In `ContentView.editorPane` (~line 80), put the tab bar directly above `EditorView()` with zero spacing so they fuse:
 
@@ -483,12 +483,12 @@ with:
         )
 ```
 
-- [ ] **Step 3: Build and verify manually**
+- [x] **Step 3: Build and verify manually**
 
 Run: `swift build && ./scripts/build-app.sh && open "build/Kokoro Studio.app"`
 Verify: tabs render above the editor; click switches scripts; ✕ closes (script stays in library); + creates; context menu renames/duplicates/closes/deletes; tabs persist across relaunch.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/KokoroStudio/Views/ScriptTabBar.swift Sources/KokoroStudio/Views/ContentView.swift
@@ -503,7 +503,7 @@ git commit -m "feat: document tab bar fused to the editor card"
 - Modify: `Sources/KokoroStudio/Views/ContentView.swift` (toolbar, before the `"profile"` item ~line 119)
 - Modify: `Sources/KokoroStudio/Views/SidebarView.swift` (Scripts section lines 62–105 + its plumbing)
 
-- [ ] **Step 1: Add the Scripts menu**
+- [x] **Step 1: Add the Scripts menu**
 
 Inside `.toolbar(id: "main")`, before the `"profile"` `ToolbarItem`, add:
 
@@ -537,19 +537,19 @@ Inside `.toolbar(id: "main")`, before the `"profile"` `ToolbarItem`, add:
             }
 ```
 
-- [ ] **Step 2: Remove the sidebar Scripts section**
+- [x] **Step 2: Remove the sidebar Scripts section**
 
 In `SidebarView.swift`:
 - Delete the whole `Section("Scripts") { ... }` block (lines 62–105).
 - Delete the now-unused `@State` vars `scriptSearch`, `renameTarget`, `renameText`, `deleteTarget` and the `filteredDocuments` computed property (top of the struct).
 - Delete the `.alert("Rename Script", ...)` and the delete `.confirmationDialog`/`.alert` modifiers attached to the `Form` that referenced `renameTarget`/`deleteTarget` (they moved into `ScriptTabBar`).
 
-- [ ] **Step 3: Build and verify manually**
+- [x] **Step 3: Build and verify manually**
 
 Run: `swift build && ./scripts/build-app.sh && open "build/Kokoro Studio.app"`
 Verify: sidebar starts at Engine; Scripts toolbar menu lists all scripts with checkmarks on open ones, opens/activates tabs, creates and imports.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/KokoroStudio/Views/ContentView.swift Sources/KokoroStudio/Views/SidebarView.swift
@@ -564,7 +564,7 @@ git commit -m "feat: scripts library toolbar menu replaces sidebar list"
 - Modify: `Sources/KokoroStudio/Views/ContentView.swift` (the `"export"` `ToolbarItem`)
 - Modify: `Sources/KokoroStudio/KokoroStudioApp.swift` (`CommandGroup(after: .newItem)`, ~line 54)
 
-- [ ] **Step 1: Replace the Export button with a split button**
+- [x] **Step 1: Replace the Export button with a split button**
 
 Replace the existing `ToolbarItem(id: "export") { Button("Export", ...) ... }` with:
 
@@ -604,7 +604,7 @@ progress is visible (the queue is already running; `BatchQueueView` shows it).
 Check `startBatch`'s behavior in `AppState` when called with the sheet closed —
 it is the same call `BatchQueueView` makes, so no changes needed there.
 
-- [ ] **Step 2: Add keyboard commands**
+- [x] **Step 2: Add keyboard commands**
 
 In `KokoroStudioApp.swift`, extend `CommandGroup(after: .newItem)`:
 
@@ -634,12 +634,12 @@ In `KokoroStudioApp.swift`, extend `CommandGroup(after: .newItem)`:
 (⌘T is registered only here; the toolbar Scripts menu's New Script button
 intentionally carries no shortcut.)
 
-- [ ] **Step 3: Build and verify manually**
+- [x] **Step 3: Build and verify manually**
 
 Run: `swift build && ./scripts/build-app.sh && open "build/Kokoro Studio.app"`
 Verify: Export button exports current script on click (⌘S works); the ▾ menu offers Batch Export… (sheet) and Export Open Tabs (queues open tabs, sheet shows progress); ⌘T, ⇧⌘W, ⌃Tab, ⌃⇧Tab all work; File menu shows the new items.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/KokoroStudio/Views/ContentView.swift Sources/KokoroStudio/KokoroStudioApp.swift
@@ -650,8 +650,8 @@ git commit -m "feat: split Export button and tab keyboard commands"
 
 ## Final verification
 
-- [ ] Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test` — all pass.
-- [ ] Run: `./scripts/build-app.sh && open "build/Kokoro Studio.app"` — full manual pass: tabs (open/close/persist/cycle), Scripts menu, sidebar settings-only, split Export, batch flows, delete-open-script edge case, Services "New Kokoro Studio Script" still lands in a new tab.
+- [x] Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test` — all pass.
+- [x] Run: `./scripts/build-app.sh && open "build/Kokoro Studio.app"` — full manual pass: tabs (open/close/persist/cycle), Scripts menu, sidebar settings-only, split Export, batch flows, delete-open-script edge case, Services "New Kokoro Studio Script" still lands in a new tab.
 
 ## Notes for the implementer
 
