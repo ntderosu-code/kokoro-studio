@@ -78,7 +78,6 @@ struct ContentView: View {
 
     private var editorPane: some View {
         VStack(spacing: 6) {
-            VStack(spacing: 0) {
             ScriptTabBar()
             EditorView()
                 // Glass floats over the page so the script scrolls beneath
@@ -110,7 +109,6 @@ struct ContentView: View {
                     .animation(.spring(duration: 0.35),
                                value: state.lastAudio?.previewWAV)
                 }
-            }
             scriptInfoRow
         }
             .padding(.horizontal, 14)
@@ -491,6 +489,7 @@ struct ContentView: View {
 struct EditorView: View {
     @EnvironmentObject private var state: AppState
     @State private var pendingPickerParagraph: Int?
+    @State private var pickerAnchorRect: CGRect = .zero
 
     private func refreshChips() {
         SpeakerChipRenderer.apply(
@@ -501,7 +500,8 @@ struct EditorView: View {
             in: EditorTextAccess.findTextView(in: NSApp.keyWindow))
     }
 
-    private func handleParagraphTap(_ paragraphIndex: Int) {
+    private func handleParagraphTap(_ paragraphIndex: Int, iconRect: CGRect) {
+        pickerAnchorRect = iconRect
         pendingPickerParagraph = paragraphIndex
     }
 
@@ -520,20 +520,17 @@ struct EditorView: View {
         return spans[index].speaker
     }
 
-    /// Applies a SpeakerTagEditor edit through the text view so the change
-    /// lands on the native undo stack as a single step.
+    /// Applies a SpeakerTagEditor edit through the script binding. Editing
+    /// the NSTextView directly (textStorage or insertText) is silently
+    /// ignored by SwiftUI's TextKit 2 editor on macOS 26, so the binding
+    /// is the only reliable route.
     private func assignSpeaker(_ speaker: String, toParagraph index: Int) {
         guard let edit = SpeakerTagEditor.assign(
-                script: state.script, paragraphIndex: index, to: speaker),
-              let textView = EditorTextAccess.focusTextView(in: NSApp.keyWindow)
+                script: state.script, paragraphIndex: index, to: speaker)
         else { return }
-        if textView.shouldChangeText(in: edit.range,
-                                     replacementString: edit.replacement) {
-            textView.textStorage?.replaceCharacters(in: edit.range,
-                                                    with: edit.replacement)
-            textView.didChangeText()
-        }
-        state.script = textView.string   // keep the binding in sync
+        let script = state.script as NSString
+        state.script = script.replacingCharacters(in: edit.range,
+                                                  with: edit.replacement)
         refreshChips()
         // Gutter refresh happens via the script change driving SpeakerGutterHost.
     }
@@ -567,7 +564,8 @@ struct EditorView: View {
                     .popover(item: Binding(
                         get: { pendingPickerParagraph.map(PickerTarget.init) },
                         set: { pendingPickerParagraph = $0?.id }
-                    ), arrowEdge: .leading) { target in
+                    ), attachmentAnchor: .rect(.rect(pickerAnchorRect)),
+                       arrowEdge: .leading) { target in
                         SpeakerPickerPopover(
                             knownSpeakers: knownSpeakers,
                             currentSpeaker: currentSpeaker(forParagraph: target.id),
@@ -591,14 +589,9 @@ struct EditorView: View {
             editorCore
         }
         .background(Color(nsColor: .textBackgroundColor))
-        // Top corners are square so the tab strip fuses to the card.
-        .clipShape(UnevenRoundedRectangle(
-            bottomLeadingRadius: GlassMetrics.cornerRadius,
-            bottomTrailingRadius: GlassMetrics.cornerRadius))
+        .clipShape(RoundedRectangle(cornerRadius: GlassMetrics.cornerRadius))
         .overlay(
-            UnevenRoundedRectangle(
-                bottomLeadingRadius: GlassMetrics.cornerRadius,
-                bottomTrailingRadius: GlassMetrics.cornerRadius)
+            RoundedRectangle(cornerRadius: GlassMetrics.cornerRadius)
                 .strokeBorder(.quaternary)
         )
         .shadow(color: .black.opacity(0.10), radius: 10, y: 2)

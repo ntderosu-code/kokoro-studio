@@ -21,7 +21,12 @@ enum SpeakerChipRenderer {
 
         guard enabled else { return }
         let ns = script as NSString
-        for span in ParagraphSpeakers.resolve(script: script) where span.hasLiteralTag {
+        let spans = ParagraphSpeakers.resolve(script: script)
+        let styles = SpeakerIdentity.styles(
+            for: spans.map(\.speaker),
+            colorOverrides: colorOverrides,
+            symbolOverrides: symbolOverrides)
+        for span in spans where span.hasLiteralTag {
             let lineRange = ns.lineRange(
                 for: NSRange(location: span.range.location, length: 0))
             let line = ns.substring(with: lineRange)
@@ -29,9 +34,7 @@ enum SpeakerChipRenderer {
             let tagLength = line.distance(from: match.0.startIndex, to: match.0.endIndex)
             let tagRange = NSRange(location: lineRange.location, length: tagLength)
             guard NSMaxRange(tagRange) <= ns.length else { continue }
-            let style = SpeakerIdentity.style(for: span.speaker,
-                                              colorOverrides: colorOverrides,
-                                              symbolOverrides: symbolOverrides)
+            guard let style = styles[span.speaker] else { continue }
             let color = SpeakerIdentity.displayColor(colorIndex: style.colorIndex)
             // Text gets a contrast-assured variant (WCAG AA 4.5:1 against the
             // pill); the pill itself keeps the full-saturation palette color.

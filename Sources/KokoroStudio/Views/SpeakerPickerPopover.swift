@@ -25,11 +25,21 @@ struct SpeakerPickerPopover: View {
         return names
     }
 
-    /// Auto slot used when the user doesn't tap a swatch.
+    /// Same assignment pass the editor gutter runs, so the swatches here
+    /// match the colors shown next to the script.
+    private var assignedStyles: [String: SpeakerIdentity.Style] {
+        SpeakerIdentity.styles(for: rows,
+                               colorOverrides: colorOverrides,
+                               symbolOverrides: symbolOverrides)
+    }
+
+    /// Auto slot used when the user doesn't tap a swatch — skips slots
+    /// already held by existing speakers, overridden or auto-assigned.
     private var autoStyle: SpeakerIdentity.Style {
-        SpeakerIdentity.nextFreeStyle(
-            usedColors: Array(colorOverrides.values),
-            usedSymbols: Array(symbolOverrides.values))
+        let taken = assignedStyles.values
+        return SpeakerIdentity.nextFreeStyle(
+            usedColors: taken.map(\.colorIndex).filter { $0 >= 0 },
+            usedSymbols: taken.map(\.symbolIndex).filter { $0 >= 0 })
     }
 
     var body: some View {
@@ -130,9 +140,9 @@ struct SpeakerPickerPopover: View {
     }
 
     private func swatch(for name: String) -> some View {
-        let style = SpeakerIdentity.style(for: name,
-                                          colorOverrides: colorOverrides,
-                                          symbolOverrides: symbolOverrides)
+        let style = assignedStyles[name]
+            ?? SpeakerIdentity.Style(colorIndex: SpeakerIdentity.narratorColorIndex,
+                                     symbolIndex: SpeakerIdentity.narratorSymbolIndex)
         let fill = SpeakerIdentity.displayColor(colorIndex: style.colorIndex)
         return Image(systemName: SpeakerIdentity.displaySymbol(symbolIndex: style.symbolIndex))
             .font(.system(size: 11, weight: .bold))

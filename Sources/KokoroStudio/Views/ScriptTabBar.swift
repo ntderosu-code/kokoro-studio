@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// Document tabs fused to the editor card's top edge. One tab per open
-/// script; the script library lives in the toolbar Scripts menu.
+/// Document tabs as a row of capsules floating above the editor card —
+/// the active tab gets the Liquid Glass pill (material fallback before
+/// macOS 26) and morphs between positions when selection moves. One tab
+/// per open script; the script library lives in the toolbar Scripts menu.
 struct ScriptTabBar: View {
     @EnvironmentObject private var state: AppState
     @State private var renameTarget: ScriptDocumentMeta?
@@ -9,6 +11,7 @@ struct ScriptTabBar: View {
     @State private var deleteTarget: ScriptDocumentMeta?
     @State private var hoveredTabID: UUID?
     @State private var hoveringNewTabButton = false
+    @Namespace private var tabGlassNamespace
 
     private var openDocuments: [ScriptDocumentMeta] {
         state.openTabIDs.compactMap { id in
@@ -19,28 +22,30 @@ struct ScriptTabBar: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 2) {
-                    ForEach(openDocuments) { doc in
-                        tab(for: doc)
-                            .id(doc.id)
+                BarGlassContainer(spacing: 6) {
+                    HStack(spacing: 4) {
+                        ForEach(openDocuments) { doc in
+                            tab(for: doc)
+                                .id(doc.id)
+                        }
+                        Button {
+                            state.createDocument()
+                        } label: {
+                            Image(systemName: "plus")
+                                .frame(width: 26, height: 24)
+                                .background(
+                                    hoveringNewTabButton ? AnyShapeStyle(.quaternary)
+                                                         : AnyShapeStyle(.clear),
+                                    in: Capsule())
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .onHover { hoveringNewTabButton = $0 }
+                        .animation(.easeOut(duration: 0.12), value: hoveringNewTabButton)
+                        .help("New script (⌘T)")
                     }
-                    Button {
-                        state.createDocument()
-                    } label: {
-                        Image(systemName: "plus")
-                            .frame(width: 26, height: 24)
-                            .background(
-                                hoveringNewTabButton ? AnyShapeStyle(.quaternary)
-                                                     : AnyShapeStyle(.clear),
-                                in: RoundedRectangle(cornerRadius: 6))
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { hoveringNewTabButton = $0 }
-                    .animation(.easeOut(duration: 0.12), value: hoveringNewTabButton)
-                    .help("New script (⌘T)")
+                    .padding(.horizontal, 2)
                 }
-                .padding(.horizontal, 6)
             }
             .onChange(of: state.currentDocumentID) { _, id in
                 if let id { withAnimation { proxy.scrollTo(id) } }
@@ -78,7 +83,6 @@ struct ScriptTabBar: View {
     private func tab(for doc: ScriptDocumentMeta) -> some View {
         let isActive = doc.id == state.currentDocumentID
         let isHovered = doc.id == hoveredTabID
-        let shape = UnevenRoundedRectangle(topLeadingRadius: 8, topTrailingRadius: 8)
         return HStack(spacing: 4) {
             Button {
                 state.closeTab(doc.id)
@@ -98,28 +102,25 @@ struct ScriptTabBar: View {
                 Text(doc.title)
                     .lineLimit(1)
                     .font(.callout)
-                    // Primary on every tab: secondary text on the recessed
-                    // gray fill falls below 4.5:1. Weight marks the active
-                    // tab so state isn't conveyed by fill alone.
+                    // Weight marks the active tab so state isn't conveyed
+                    // by the pill alone; primary text keeps AA contrast.
                     .fontWeight(isActive ? .semibold : .regular)
                     .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .padding(.vertical, 5)
-        .frame(maxWidth: 180)
-        .background(shape.fill(tabFill(isActive: isActive, isHovered: isHovered)))
-        .overlay {
-            // Hairline keeps inactive tabs legible against the pane; the
-            // active tab stays borderless so it fuses with the editor card.
-            if !isActive {
-                shape.strokeBorder(.quaternary)
+        .frame(maxWidth: 200)
+        .background {
+            if isHovered && !isActive {
+                Capsule().fill(.quaternary)
             }
         }
-        .contentShape(Rectangle())
+        .modifier(ActiveTabPill(isActive: isActive,
+                                namespace: tabGlassNamespace))
+        .contentShape(Capsule())
         .onTapGesture { state.selectDocument(doc.id) }
         .onHover { hovering in
             if hovering {
@@ -129,7 +130,6 @@ struct ScriptTabBar: View {
             }
         }
         .animation(.easeOut(duration: 0.12), value: hoveredTabID)
-        .animation(.easeOut(duration: 0.15), value: state.currentDocumentID)
         .contextMenu {
             Button("Rename…") {
                 renameText = doc.title
@@ -147,13 +147,28 @@ struct ScriptTabBar: View {
         .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 
-    /// Active fuses with the editor card; inactive sits recessed against
-    /// the pane; hover lifts an inactive tab partway toward active.
-    private func tabFill(isActive: Bool, isHovered: Bool) -> Color {
-        if isActive { return Color(nsColor: .textBackgroundColor) }
-        let recessed = NSColor.underPageBackgroundColor
-        guard isHovered else { return Color(nsColor: recessed) }
-        let lifted = recessed.blended(withFraction: 0.4, of: .textBackgroundColor)
-        return Color(nsColor: lifted ?? recessed)
+}
+
+/// Liquid Glass capsule behind the active tab (macOS 26+), with a
+/// material-and-stroke capsule fallback on earlier systems. A shared
+/// glassEffectID makes the pill morph when selection moves between tabs.
+private struct ActiveTabPill: ViewModifier {
+    let isActive: Bool
+    let namespace: Namespace.ID
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if !isActive {
+            content
+        } else if #available(macOS 26.0, *) {
+            content
+                .glassEffect(.regular.tint(Color.accentColor.opacity(0.32)),
+                             in: .capsule)
+                .glassEffectID("active-script-tab", in: namespace)
+        } else {
+            content
+                .background(Color.accentColor.opacity(0.18), in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.4)))
+        }
     }
 }

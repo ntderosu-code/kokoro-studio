@@ -4,10 +4,41 @@ import XCTest
 
 final class SpeakerIdentityTests: XCTestCase {
     func testNarratorHasFixedStyle() {
-        let style = SpeakerIdentity.style(for: "Narrator",
-                                          colorOverrides: [:], symbolOverrides: [:])
-        XCTAssertEqual(style.colorIndex, SpeakerIdentity.narratorColorIndex)
-        XCTAssertEqual(style.symbolIndex, SpeakerIdentity.narratorSymbolIndex)
+        let styles = SpeakerIdentity.styles(for: ["Narrator"],
+                                            colorOverrides: [:], symbolOverrides: [:])
+        XCTAssertEqual(styles["Narrator"]?.colorIndex, SpeakerIdentity.narratorColorIndex)
+        XCTAssertEqual(styles["Narrator"]?.symbolIndex, SpeakerIdentity.narratorSymbolIndex)
+    }
+
+    func testSpeakersGetDistinctStylesInAppearanceOrder() {
+        let styles = SpeakerIdentity.styles(for: ["Byron", "Maya", "Sam"],
+                                            colorOverrides: [:], symbolOverrides: [:])
+        XCTAssertEqual(styles["Byron"], SpeakerIdentity.Style(colorIndex: 0, symbolIndex: 0))
+        XCTAssertEqual(styles["Maya"], SpeakerIdentity.Style(colorIndex: 1, symbolIndex: 1))
+        XCTAssertEqual(styles["Sam"], SpeakerIdentity.Style(colorIndex: 2, symbolIndex: 2))
+    }
+
+    func testOverrideWinsAndItsSlotIsSkippedForAutoAssignment() {
+        let styles = SpeakerIdentity.styles(for: ["Byron", "Maya"],
+                                            colorOverrides: ["Byron": 0],
+                                            symbolOverrides: ["Byron": 0])
+        XCTAssertEqual(styles["Byron"], SpeakerIdentity.Style(colorIndex: 0, symbolIndex: 0))
+        XCTAssertEqual(styles["Maya"], SpeakerIdentity.Style(colorIndex: 1, symbolIndex: 1))
+    }
+
+    func testNarratorDoesNotConsumeAPaletteSlot() {
+        let styles = SpeakerIdentity.styles(for: ["Narrator", "Byron"],
+                                            colorOverrides: [:], symbolOverrides: [:])
+        XCTAssertEqual(styles["Byron"]?.colorIndex, 0)
+    }
+
+    func testMoreSpeakersThanPaletteSlotsWrapWithoutPilingOnOneSlot() {
+        let names = (0..<10).map { "Speaker\($0)" }
+        let styles = SpeakerIdentity.styles(for: names,
+                                            colorOverrides: [:], symbolOverrides: [:])
+        // 10 speakers over 8 slots: the two wrapped ones reuse different slots.
+        XCTAssertEqual(styles["Speaker8"]?.colorIndex, 0)
+        XCTAssertEqual(styles["Speaker9"]?.colorIndex, 1)
     }
 
     func testNextFreeStylePicksLowestUnusedSlot() {
@@ -23,11 +54,10 @@ final class SpeakerIdentityTests: XCTestCase {
     }
 
     func testOverrideTakesPrecedence() {
-        let style = SpeakerIdentity.style(for: "Alex",
-                                          colorOverrides: ["Alex": 5],
-                                          symbolOverrides: ["Alex": 3])
-        XCTAssertEqual(style.colorIndex, 5)
-        XCTAssertEqual(style.symbolIndex, 3)
+        let styles = SpeakerIdentity.styles(for: ["Alex"],
+                                            colorOverrides: ["Alex": 5],
+                                            symbolOverrides: ["Alex": 3])
+        XCTAssertEqual(styles["Alex"], SpeakerIdentity.Style(colorIndex: 5, symbolIndex: 3))
     }
 
     // MARK: - WCAG contrast (issue #41)
@@ -74,6 +104,13 @@ final class SpeakerIdentityTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(ratio, 3.0,
                 "palette \(index) icon: \(ratio)")
         }
+    }
+
+    func testIconForegroundPrefersWhiteWhenWhiteIsLegible() {
+        // Black contrasts marginally more on systemBlue, but white still
+        // clears 3:1 and is the conventional fill — prefer it.
+        let symbol = SpeakerIdentity.iconForeground(on: .systemBlue)
+        XCTAssertGreaterThan(SpeakerIdentity.relativeLuminance(of: symbol), 0.5)
     }
 
     func testIconForegroundIsDarkOnYellow() {

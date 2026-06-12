@@ -5,7 +5,9 @@ import SwiftUI
 /// aligned to the text via the layout manager. Click opens the picker.
 @MainActor
 final class SpeakerGutterView: NSView {
-    var onClickParagraph: ((Int) -> Void)?
+    /// Called with the paragraph index and the clicked icon's rect (in this
+    /// view's coordinates) so the picker popover can anchor on the icon.
+    var onClickParagraph: ((Int, NSRect) -> Void)?
 
     private weak var textView: NSTextView?
     private var iconRects: [(paragraphIndex: Int, rect: NSRect)] = []
@@ -27,6 +29,9 @@ final class SpeakerGutterView: NSView {
         styles.removeAll()
         let textLength = (textView.string as NSString).length
         let spans = ParagraphSpeakers.resolve(script: script)
+        let assigned = SpeakerIdentity.styles(for: spans.map(\.speaker),
+                                              colorOverrides: colorOverrides,
+                                              symbolOverrides: symbolOverrides)
         for (index, span) in spans.enumerated() {
             guard span.range.location < textLength else { continue }
             let glyphRange = lm.glyphRange(
@@ -39,9 +44,9 @@ final class SpeakerGutterView: NSView {
             let inGutter = convert(rect, from: textView)
             let iconRect = NSRect(x: 7, y: inGutter.minY + 1, width: 20, height: 20)
             iconRects.append((index, iconRect))
-            let style = SpeakerIdentity.style(for: span.speaker,
-                                              colorOverrides: colorOverrides,
-                                              symbolOverrides: symbolOverrides)
+            let style = assigned[span.speaker]
+                ?? SpeakerIdentity.Style(colorIndex: SpeakerIdentity.narratorColorIndex,
+                                         symbolIndex: SpeakerIdentity.narratorSymbolIndex)
             styles.append((SpeakerIdentity.displayColor(colorIndex: style.colorIndex),
                            SpeakerIdentity.displaySymbol(symbolIndex: style.symbolIndex)))
         }
@@ -68,7 +73,7 @@ final class SpeakerGutterView: NSView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         if let hit = iconRects.first(where: { $0.rect.contains(point) }) {
-            onClickParagraph?(hit.paragraphIndex)
+            onClickParagraph?(hit.paragraphIndex, hit.rect)
         }
     }
 }
@@ -79,7 +84,7 @@ struct SpeakerGutterHost: NSViewRepresentable {
     let script: String
     let colorOverrides: [String: Int]
     let symbolOverrides: [String: Int]
-    let paragraphTapped: (Int) -> Void
+    let paragraphTapped: (Int, CGRect) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 

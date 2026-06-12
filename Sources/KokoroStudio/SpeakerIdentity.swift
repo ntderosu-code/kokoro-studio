@@ -29,20 +29,33 @@ enum SpeakerIdentity {
     static let narratorColor = NSColor.systemGray
     static let narratorSymbolName = "text.alignleft"
 
-    /// Resolve a speaker to its style, honoring overrides, else auto-assigning.
-    static func style(for name: String,
-                      colorOverrides: [String: Int],
-                      symbolOverrides: [String: Int]) -> Style {
-        if name == narratorName {
-            return Style(colorIndex: narratorColorIndex, symbolIndex: narratorSymbolIndex)
+    /// Resolve every speaker to a distinct style in one pass, in order of
+    /// appearance. Overrides win, and the slots they occupy are skipped
+    /// when auto-assigning the remaining speakers — so speakers without an
+    /// override still come out visually distinct from each other.
+    static func styles(for speakers: [String],
+                       colorOverrides: [String: Int],
+                       symbolOverrides: [String: Int]) -> [String: Style] {
+        var resolved: [String: Style] = [:]
+        var usedColors = Array(colorOverrides.values)
+        var usedSymbols = Array(symbolOverrides.values)
+        for name in speakers where resolved[name] == nil {
+            if name == narratorName {
+                resolved[name] = Style(colorIndex: narratorColorIndex,
+                                       symbolIndex: narratorSymbolIndex)
+                continue
+            }
+            let style = Style(
+                colorIndex: colorOverrides[name] ?? lowestFree(in: usedColors),
+                symbolIndex: symbolOverrides[name] ?? lowestFree(in: usedSymbols))
+            resolved[name] = style
+            usedColors.append(style.colorIndex)
+            usedSymbols.append(style.symbolIndex)
         }
-        let auto = nextFreeStyle(usedColors: Array(colorOverrides.values),
-                                 usedSymbols: Array(symbolOverrides.values))
-        return Style(colorIndex: colorOverrides[name] ?? auto.colorIndex,
-                     symbolIndex: symbolOverrides[name] ?? auto.symbolIndex)
+        return resolved
     }
 
-    /// Lowest palette slot not already used; wraps modulo when full.
+    /// Lowest palette slot not already used; wraps round-robin when full.
     static func nextFreeStyle(usedColors: [Int], usedSymbols: [Int]) -> Style {
         Style(colorIndex: lowestFree(in: usedColors),
               symbolIndex: lowestFree(in: usedSymbols))
@@ -51,7 +64,7 @@ enum SpeakerIdentity {
     private static func lowestFree(in used: [Int]) -> Int {
         let set = Set(used)
         for i in 0..<paletteCount where !set.contains(i) { return i }
-        return (used.max() ?? -1).advanced(by: 1) % paletteCount
+        return used.count % paletteCount
     }
 
     /// Display color for a resolved style (handles the narrator sentinel).
@@ -118,10 +131,11 @@ enum SpeakerIdentity {
         }
     }
 
-    /// White or black for symbols drawn on a solid speaker-color fill
-    /// (gutter icons, picker swatches), whichever contrasts more.
+    /// Symbol color for a solid speaker-color fill (gutter icons, picker
+    /// swatches): white when it clears the 3:1 non-text minimum, else black
+    /// (the light fills — yellow, teal — where white washes out).
     static func iconForeground(on fill: NSColor) -> NSColor {
-        contrastRatio(fill, .white) >= contrastRatio(fill, .black) ? .white : .black
+        contrastRatio(fill, .white) >= 3.0 ? .white : .black
     }
 
     /// Blends `base` toward black or white — whichever direction gains
