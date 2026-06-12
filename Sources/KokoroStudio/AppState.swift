@@ -75,6 +75,9 @@ final class AppState: ObservableObject {
     @AppStorage("headingPauseMs") var headingPauseMs = 800
     @AppStorage("pronunciationRules") var pronunciationRulesText = ""
     @AppStorage("speakerVoices") var speakerVoicesJSON = ""
+    @AppStorage("speakerColors") var speakerColorsJSON = ""
+    @AppStorage("speakerSymbols") var speakerSymbolsJSON = ""
+    @AppStorage("marginSpeakerMode") var marginSpeakerMode = false
     @AppStorage("numberPreset") private var numberPresetRaw = NumberPreset.natural.rawValue
 
     var numberPreset: NumberPreset {
@@ -118,6 +121,38 @@ final class AppState: ObservableObject {
             }
         }
     }
+    /// Speaker name -> palette color index (see SpeakerIdentity). Overrides
+    /// the auto-assigned color.
+    var speakerColors: [String: Int] {
+        get {
+            guard let data = speakerColorsJSON.data(using: .utf8),
+                  let map = try? JSONDecoder().decode([String: Int].self, from: data)
+            else { return [:] }
+            return map
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                speakerColorsJSON = String(data: data, encoding: .utf8) ?? ""
+            }
+        }
+    }
+
+    /// Speaker name -> palette symbol index (see SpeakerIdentity). Overrides
+    /// the auto-assigned symbol.
+    var speakerSymbols: [String: Int] {
+        get {
+            guard let data = speakerSymbolsJSON.data(using: .utf8),
+                  let map = try? JSONDecoder().decode([String: Int].self, from: data)
+            else { return [:] }
+            return map
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                speakerSymbolsJSON = String(data: data, encoding: .utf8) ?? ""
+            }
+        }
+    }
+
     @AppStorage("engineKind") private var engineKindRaw = TTSEngineKind.kokoro.rawValue
     @AppStorage("pocketVoicePath") var pocketVoicePath = ""
     @AppStorage("normalizeLoudness") var normalizeLoudness = true
