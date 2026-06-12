@@ -442,6 +442,15 @@ struct ContentView: View {
 struct EditorView: View {
     @EnvironmentObject private var state: AppState
 
+    private func refreshChips() {
+        SpeakerChipRenderer.apply(
+            enabled: state.marginSpeakerMode,
+            script: state.script,
+            colorOverrides: state.speakerColors,
+            symbolOverrides: state.speakerSymbols,
+            in: EditorTextAccess.findTextView(in: NSApp.keyWindow))
+    }
+
     var body: some View {
         TextEditor(text: $state.script)
             .font(.system(size: state.editorFontSize))
@@ -470,5 +479,8 @@ struct EditorView: View {
                 .strokeBorder(.quaternary)
         )
         .shadow(color: .black.opacity(0.10), radius: 10, y: 2)
+        .onAppear { refreshChips() }
+        .onChange(of: state.script) { _, _ in refreshChips() }
+        .onChange(of: state.marginSpeakerMode) { _, _ in refreshChips() }
     }
 }
