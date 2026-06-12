@@ -3,3 +3,6 @@ build/
 vendor/
 .DS_Store
 *.xcodeproj
+
+# Superpowers brainstorm scratch
+.superpowers/
