@@ -80,6 +80,25 @@ final class CaptionWriterTests: XCTestCase {
         XCTAssertFalse(output.contains("@"))
     }
 
+    func testScriptToVTTEndToEndSpeakerLabels() {
+        // Script -> segmenter -> cues -> VTT, with fake sample counts.
+        let script = "Plain intro.\n\n@Alex:\nHello there.\nStill Alex.\n\n@Sam: Hi back."
+        let segments = ScriptSegmenter.segment(
+            script,
+            pauses: PauseSettings(paragraphMs: 0, sentenceMs: 0,
+                                  clauseMs: 0, headingMs: 0),
+            sentenceSplit: true)
+        let results = segments.map { ($0.text, 24000, $0.pauseAfterMs, $0.speaker) }
+        let vtt = CaptionWriter.vtt(
+            CaptionWriter.buildCues(segments: results, sampleRate: 24000))
+        XCTAssertTrue(vtt.contains("\nPlain intro.\n"))
+        XCTAssertTrue(vtt.contains("\nAlex: Hello there.\n"))
+        XCTAssertTrue(vtt.contains("\nStill Alex.\n"))
+        XCTAssertFalse(vtt.contains("Alex: Still Alex."))
+        XCTAssertTrue(vtt.contains("\nSam: Hi back.\n"))
+        XCTAssertFalse(vtt.contains("@"))
+    }
+
     func testSentenceSplitForCaptions() {
         let segments = ScriptSegmenter.segment(
             "One sentence. Another one! A third?",
