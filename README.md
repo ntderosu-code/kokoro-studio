@@ -23,6 +23,10 @@ unzip, drag to Applications, double-click. macOS 14+ (Apple Silicon & Intel).
 - **Pocket TTS engine** — clone any voice from a 5–15 second audio sample
 - Multi-speaker dialogue: tag lines `@Maya:` / `@Sam:` and map each speaker
   to a voice
+- **Margin speaker mode**: a colored icon beside every paragraph shows who
+  speaks it — click to assign a speaker, or create one with its own voice
+  and color; `@Speaker:` tags render as colored chips and redundant tags
+  clean themselves up
 - **Compare Voices**: hear the same line in two voices side by side, then
   adopt the winner with one click
 
@@ -41,20 +45,23 @@ unzip, drag to Applications, double-click. macOS 14+ (Apple Silicon & Intel).
 
 **Output**
 - WAV (lossless) or M4A (AAC) export
-- Synced **VTT/SRT captions** with sample-accurate sentence cues
+- Synced **VTT/SRT captions** with sample-accurate sentence cues — dialogue
+  cues are labeled with the speaker's name where the speaker changes
 - **Module splitting**: `## file: lesson-2` markers export one audio +
   caption file per section from a single document
 - Loudness normalization: silence trim, −1 dBFS leveling, anti-click fades
 - **Loudness presets**: −16 LUFS podcast, −14 LUFS streaming, or a custom
   integrated-loudness target (BS.1770) at export
 - **Batch export**: queue several scripts and walk away — each renders
-  with its own profile, honors module splitting, and notifies when done
+  with its own profile, honors module splitting, and notifies when done;
+  the Export button's menu can also queue all open tabs in one click
 - Lead-in/lead-out silence padding for LMS players that clip
 - Live estimated audio length that calibrates from your actual generations
 
 **Editor**
-- **Script library**: every lesson lives in the sidebar with autosave —
-  each script remembers its profile
+- **Script tabs**: every lesson opens as a document tab above the editor,
+  with autosave — open tabs persist across launches, each script remembers
+  its profile, and the full library lives in the toolbar's Scripts menu
 - **Document import** (⌘O or drag-and-drop): `.docx`, `.md`, `.txt`,
   `.rtf` — headings and bold convert to script syntax, with a preview
   before anything touches your editor
@@ -82,6 +89,9 @@ unzip, drag to Applications, double-click. macOS 14+ (Apple Silicon & Intel).
 | Patch re-render edited lines | ⌥⌘↩ |
 | Preview selection | ⇧⌘↩ |
 | Export | ⌘S |
+| New script | ⌘T |
+| Close tab | ⇧⌘W |
+| Next / previous tab | ⌃Tab / ⌃⇧Tab |
 | Import document | ⌘O |
 | Play / Pause | ⌘P |
 | Add selection to dictionary | ⌘D |
