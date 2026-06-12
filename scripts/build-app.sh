@@ -82,8 +82,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Kokoro Studio</string>
   <key>CFBundleDisplayName</key><string>Kokoro Studio</string>
   <key>CFBundleIdentifier</key><string>com.byron.KokoroStudio</string>
-  <key>CFBundleVersion</key><string>1.5</string>
-  <key>CFBundleShortVersionString</key><string>1.5</string>
+  <key>CFBundleVersion</key><string>1.5.1</string>
+  <key>CFBundleShortVersionString</key><string>1.5.1</string>
   <key>CFBundleExecutable</key><string>Kokoro Studio</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
@@ -136,10 +136,13 @@ sign_sparkle_framework() {
   local identity="$1"
   local framework="$APP/Contents/Frameworks/Sparkle.framework"
   local version_dir="$framework/Versions/B"
-  local args=(--force --options runtime --sign "$identity")
+  local args=(--force --sign "$identity")
 
+  # Hardened runtime + timestamp only for notarized releases. An ad-hoc
+  # (team-less) app with hardened runtime gets library validation, which
+  # refuses to load any bundled non-Apple framework — the app won't launch.
   if $RELEASE; then
-    args+=(--timestamp)
+    args+=(--options runtime --timestamp)
   fi
 
   [ -d "$framework" ] || return 0
@@ -178,9 +181,10 @@ if $RELEASE; then
   ditto -c -k --sequesterRsrc --keepParent "$APP" build/KokoroStudio.zip
   echo "Notarized and stapled: build/KokoroStudio.zip"
 else
-  codesign --force --options runtime --sign - "$APP/Contents/Frameworks/"*.dylib
+  # No --options runtime here: see the library-validation note above.
+  codesign --force --sign - "$APP/Contents/Frameworks/"*.dylib
   sign_sparkle_framework "-"
-  codesign --force --options runtime --sign - "$APP"
+  codesign --force --sign - "$APP"
 fi
 
 echo "Built: $APP"
