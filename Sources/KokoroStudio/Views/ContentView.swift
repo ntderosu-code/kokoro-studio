@@ -441,6 +441,7 @@ struct ContentView: View {
 
 struct EditorView: View {
     @EnvironmentObject private var state: AppState
+    @State private var pendingPickerParagraph: Int?
 
     private func refreshChips() {
         SpeakerChipRenderer.apply(
@@ -451,7 +452,34 @@ struct EditorView: View {
             in: EditorTextAccess.findTextView(in: NSApp.keyWindow))
     }
 
+    private func handleParagraphTap(_ paragraphIndex: Int) {
+        pendingPickerParagraph = paragraphIndex
+    }
+
     var body: some View {
+        HStack(spacing: 0) {
+            if state.marginSpeakerMode {
+                SpeakerGutterHost(script: state.script,
+                                  colorOverrides: state.speakerColors,
+                                  symbolOverrides: state.speakerSymbols,
+                                  paragraphTapped: handleParagraphTap)
+                    .frame(width: 34)
+            }
+            editorCore
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: GlassMetrics.cornerRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: GlassMetrics.cornerRadius)
+                .strokeBorder(.quaternary)
+        )
+        .shadow(color: .black.opacity(0.10), radius: 10, y: 2)
+        .onAppear { refreshChips() }
+        .onChange(of: state.script) { _, _ in refreshChips() }
+        .onChange(of: state.marginSpeakerMode) { _, _ in refreshChips() }
+    }
+
+    private var editorCore: some View {
         TextEditor(text: $state.script)
             .font(.system(size: state.editorFontSize))
             .lineSpacing(4)
@@ -472,15 +500,5 @@ struct EditorView: View {
             .padding(8)
             // Keep the last lines reachable above the floating glass bars.
             .contentMargins(.bottom, 120, for: .scrollContent)
-        .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: GlassMetrics.cornerRadius))
-        .overlay(
-            RoundedRectangle(cornerRadius: GlassMetrics.cornerRadius)
-                .strokeBorder(.quaternary)
-        )
-        .shadow(color: .black.opacity(0.10), radius: 10, y: 2)
-        .onAppear { refreshChips() }
-        .onChange(of: state.script) { _, _ in refreshChips() }
-        .onChange(of: state.marginSpeakerMode) { _, _ in refreshChips() }
     }
 }
