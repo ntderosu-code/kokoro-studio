@@ -45,7 +45,7 @@
 **Files:**
 - Modify: `Sources/KokoroStudio/AppState.swift` (near the existing `speakerVoices` accessor, ~line 90; and the `@AppStorage` block, ~line 77)
 
-- [ ] **Step 1: Add the storage fields and mode flag**
+- [x] **Step 1: Add the storage fields and mode flag**
 
 In the `@AppStorage` block near `speakerVoicesJSON` (line 77), add:
 
@@ -55,7 +55,7 @@ In the `@AppStorage` block near `speakerVoicesJSON` (line 77), add:
     @AppStorage("marginSpeakerMode") var marginSpeakerMode = false
 ```
 
-- [ ] **Step 2: Add the typed accessors**
+- [x] **Step 2: Add the typed accessors**
 
 Immediately after the `speakerSpeeds` computed property (ends ~line 120), add two accessors that mirror the existing JSON-map pattern exactly:
 
@@ -93,12 +93,12 @@ Immediately after the `speakerSpeeds` computed property (ends ~line 120), add tw
     }
 ```
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 Run: `swift build`
 Expected: builds with no errors (warnings about unused properties are fine until later tasks wire them up).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/KokoroStudio/AppState.swift
@@ -113,7 +113,7 @@ git commit -m "feat: AppState storage for speaker colors, symbols, and margin mo
 - Create: `Sources/KokoroStudio/SpeakerIdentity.swift`
 - Test: `Tests/KokoroStudioTests/SpeakerIdentityTests.swift`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `Tests/KokoroStudioTests/SpeakerIdentityTests.swift`:
 
@@ -151,12 +151,12 @@ final class SpeakerIdentityTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter SpeakerIdentityTests`
 Expected: FAIL — `cannot find 'SpeakerIdentity' in scope`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `Sources/KokoroStudio/SpeakerIdentity.swift`:
 
@@ -229,12 +229,12 @@ enum SpeakerIdentity {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter SpeakerIdentityTests`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/KokoroStudio/SpeakerIdentity.swift Tests/KokoroStudioTests/SpeakerIdentityTests.swift
@@ -251,7 +251,7 @@ git commit -m "feat: SpeakerIdentity palette and deterministic auto-assignment"
 
 **Contract:** A paragraph is a maximal run of consecutive non-blank lines (blank = empty or whitespace only). `resolve` returns one `Span` per paragraph, in document order. `speaker` is the effective speaker as of the paragraph's first line (after applying that line's tag if present); untagged paragraphs inherit from above, defaulting to `"Narrator"`. `hasLiteralTag` is true when the paragraph's first line is itself an `@Name:` tag. A tag on a non-first line updates inheritance for *later* paragraphs but does not change the current paragraph's `speaker` (documented edge case).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `Tests/KokoroStudioTests/ParagraphSpeakersTests.swift`:
 
@@ -298,12 +298,12 @@ final class ParagraphSpeakersTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter ParagraphSpeakersTests`
 Expected: FAIL — `cannot find 'ParagraphSpeakers' in scope`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `Sources/KokoroStudio/ParagraphSpeakers.swift`:
 
@@ -370,12 +370,12 @@ enum ParagraphSpeakers {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter ParagraphSpeakersTests`
 Expected: PASS (5 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/KokoroStudio/ParagraphSpeakers.swift Tests/KokoroStudioTests/ParagraphSpeakersTests.swift
@@ -396,7 +396,7 @@ git commit -m "feat: ParagraphSpeakers resolves sticky effective speakers per pa
 - chosen != inherited, no literal tag → insert `@chosen:\n` at paragraph start.
 - chosen != inherited, has literal tag → rewrite the tag line's name, preserving any inline text.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `Tests/KokoroStudioTests/SpeakerTagEditorTests.swift`:
 
@@ -461,12 +461,12 @@ final class SpeakerTagEditorTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter SpeakerTagEditorTests`
 Expected: FAIL — `cannot find 'SpeakerTagEditor' in scope`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `Sources/KokoroStudio/SpeakerTagEditor.swift`:
 
@@ -531,12 +531,12 @@ enum SpeakerTagEditor {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter SpeakerTagEditorTests`
 Expected: PASS (8 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/KokoroStudio/SpeakerTagEditor.swift Tests/KokoroStudioTests/SpeakerTagEditorTests.swift
@@ -553,12 +553,12 @@ The reserved `"Narrator"` name (and any speaker with no `speakerVoices` entry) m
 - Test: `Tests/KokoroStudioTests/SpeakerTagEditorTests.swift` (append) — or a small dedicated test if voice resolution lives in a pure helper.
 - Inspect: `Sources/KokoroStudio/AppState.swift` (search for where `speakerVoices` is read during `makeSynthesisPlan`).
 
-- [ ] **Step 1: Locate voice resolution**
+- [x] **Step 1: Locate voice resolution**
 
 Run: `grep -n "speakerVoices\[" Sources/KokoroStudio/AppState.swift`
 Read the surrounding lines. Identify the expression that maps a segment's `speaker` name to a voice ID (expected shape: `speakerVoices[name] ?? voiceID`).
 
-- [ ] **Step 2: If resolution is inline, extract a pure helper**
+- [x] **Step 2: If resolution is inline, extract a pure helper**
 
 If the lookup is an inline `speakerVoices[name] ?? voiceID`, leave it. If it is more complex, extract a static pure function so it can be tested, e.g. in `AppState.swift`:
 
@@ -575,7 +575,7 @@ If the lookup is an inline `speakerVoices[name] ?? voiceID`, leave it. If it is 
 
 Then use it at the existing call site.
 
-- [ ] **Step 3: Write the test**
+- [x] **Step 3: Write the test**
 
 Append to `SpeakerTagEditorTests.swift` (or a new `SpeakerVoiceResolutionTests.swift` if you extracted the helper):
 
@@ -595,12 +595,12 @@ Append to `SpeakerTagEditorTests.swift` (or a new `SpeakerVoiceResolutionTests.s
 
 If you did **not** extract a helper (the inline `?? voiceID` was already correct), skip this test and instead add a one-line comment at the call site noting that `"Narrator"` intentionally relies on the default-voice fallthrough, then move on.
 
-- [ ] **Step 4: Run tests + build**
+- [x] **Step 4: Run tests + build**
 
 Run: `swift build && DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter SpeakerTagEditorTests`
 Expected: builds; tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -616,7 +616,7 @@ Wire the mode flag to a toolbar button. No gutter/chips yet — just prove the t
 **Files:**
 - Modify: `Sources/KokoroStudio/Views/ContentView.swift` (the `.toolbar(id: "main")` block, ~line 196 alongside the "editing" `ToolbarItem`)
 
-- [ ] **Step 1: Add a toolbar toggle**
+- [x] **Step 1: Add a toolbar toggle**
 
 Inside `.toolbar(id: "main")`, after the `"editing"` `ToolbarItem` (closes ~line 209), add:
 
@@ -636,12 +636,12 @@ Inside `.toolbar(id: "main")`, after the `"editing"` `ToolbarItem` (closes ~line
             }
 ```
 
-- [ ] **Step 2: Build and verify manually**
+- [x] **Step 2: Build and verify manually**
 
 Run: `swift build && ./scripts/build-app.sh && open "build/Kokoro Studio.app"`
 Verify: the toolbar shows a new toggle; clicking flips the icon; quitting and relaunching preserves the on/off state (it is `@AppStorage`-backed).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add Sources/KokoroStudio/Views/ContentView.swift
@@ -658,7 +658,7 @@ Render each `@Name:` tag range with a colored tint + leading dot via layout-mana
 - Create: `Sources/KokoroStudio/Views/SpeakerChipRenderer.swift`
 - Modify: `Sources/KokoroStudio/Views/ContentView.swift` (`EditorView`, ~line 428)
 
-- [ ] **Step 1: Create the renderer**
+- [x] **Step 1: Create the renderer**
 
 Create `Sources/KokoroStudio/Views/SpeakerChipRenderer.swift`:
 
@@ -701,7 +701,7 @@ enum SpeakerChipRenderer {
 }
 ```
 
-- [ ] **Step 2: Drive it from EditorView**
+- [x] **Step 2: Drive it from EditorView**
 
 In `EditorView` (ContentView.swift ~line 428), after the `TextEditor` modifiers, add a refresh that runs on appear and whenever the script or mode changes. Add near the top of `EditorView`:
 
@@ -724,12 +724,12 @@ and attach to the `TextEditor` (inside `body`, after `.shadow(...)` on the outer
         .onChange(of: state.marginSpeakerMode) { _, _ in refreshChips() }
 ```
 
-- [ ] **Step 3: Build and verify manually**
+- [x] **Step 3: Build and verify manually**
 
 Run: `swift build && ./scripts/build-app.sh && open "build/Kokoro Studio.app"`
 Verify: with margin mode ON and a script containing `@Alex:` / `@Sam:` lines, each tag line shows in its speaker's color; toggling OFF clears it; editing text keeps colors correct.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/KokoroStudio/Views/SpeakerChipRenderer.swift Sources/KokoroStudio/Views/ContentView.swift
@@ -748,7 +748,7 @@ A thin AppKit view aligned to the editor's text, drawing one clickable icon per 
 - Create: `Sources/KokoroStudio/Views/SpeakerGutterView.swift`
 - Modify: `Sources/KokoroStudio/Views/ContentView.swift` (`EditorView`)
 
-- [ ] **Step 1 (spike): Prove glyph-rect alignment**
+- [x] **Step 1 (spike): Prove glyph-rect alignment**
 
 Create `Sources/KokoroStudio/Views/SpeakerGutterView.swift` with a view that, given the editor's `NSTextView`, computes the y-position of each paragraph's first line and logs it:
 
@@ -829,7 +829,7 @@ Run a build and a quick manual check that icon y-positions track the right lines
 Run: `swift build`
 Expected: builds.
 
-- [ ] **Step 2: Host the gutter beside the editor and keep it in sync**
+- [x] **Step 2: Host the gutter beside the editor and keep it in sync**
 
 In `EditorView` (ContentView.swift), wrap the editor in an `HStack` with a fixed-width gutter host when margin mode is on. Add a small `NSViewRepresentable` host that creates the `SpeakerGutterView`, finds the editor text view via `EditorTextAccess.findTextView`, and calls `refresh(...)`. Trigger `refresh` on: `.onAppear`, `state.script` change, `state.marginSpeakerMode` change, and the `NSView.boundsDidChangeNotification` of the editor's scroll view (for scroll/resize). Reuse the `refreshChips()` pattern; add the gutter refresh alongside it.
 
@@ -853,12 +853,12 @@ Extract the current `TextEditor(...)` chain (lines ~432–459) into a `private v
     }
 ```
 
-- [ ] **Step 3: Build and verify manually**
+- [x] **Step 3: Build and verify manually**
 
 Run: `swift build && ./scripts/build-app.sh && open "build/Kokoro Studio.app"`
 Verify: with margin mode ON, a colored icon appears beside each paragraph's first line; icons stay aligned while scrolling and when font size changes; clicking an icon logs / sets the pending paragraph (add a temporary `Swift.print`).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/KokoroStudio/Views/SpeakerGutterView.swift Sources/KokoroStudio/Views/ContentView.swift
@@ -875,7 +875,7 @@ Clicking a gutter icon opens a Liquid-Glass popover listing Narrator, known spea
 - Create: `Sources/KokoroStudio/Views/SpeakerPickerPopover.swift`
 - Modify: `Sources/KokoroStudio/Views/ContentView.swift` (`EditorView`)
 
-- [ ] **Step 1: Create the popover view**
+- [x] **Step 1: Create the popover view**
 
 Create `Sources/KokoroStudio/Views/SpeakerPickerPopover.swift`:
 
@@ -940,7 +940,7 @@ struct SpeakerPickerPopover: View {
 }
 ```
 
-- [ ] **Step 2: Present it and apply the edit**
+- [x] **Step 2: Present it and apply the edit**
 
 In `EditorView`, present the popover from the gutter using a `.popover` bound to `pendingPickerParagraph` (the `@State Int?` from Task 8). Add a helper that applies the edit through the text view so native undo is preserved:
 
@@ -962,12 +962,12 @@ In `EditorView`, present the popover from the gutter using a `.popover` bound to
 
 Wire the popover's `onPick` to `assignSpeaker(_:toParagraph:)` then clear `pendingPickerParagraph`. Compute `knownSpeakers` from `Array(state.speakerVoices.keys)` plus any names found by `ParagraphSpeakers.resolve(script:)`. Set `currentSpeaker` from the resolved span at `index`.
 
-- [ ] **Step 3: Build and verify manually**
+- [x] **Step 3: Build and verify manually**
 
 Run: `swift build && ./scripts/build-app.sh && open "build/Kokoro Studio.app"`
 Verify: clicking a gutter icon opens the popover; picking a different speaker inserts/edits the `@Name:` line; picking the inherited speaker cleans a redundant tag; ⌘Z undoes the change as a single step; gutter + chips update.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/KokoroStudio/Views/SpeakerPickerPopover.swift Sources/KokoroStudio/Views/ContentView.swift
@@ -984,7 +984,7 @@ git commit -m "feat: speaker picker popover applies smart tag edits with undo"
 - Modify: `Sources/KokoroStudio/Views/SpeakerPickerPopover.swift` (add a second pane)
 - Modify: `Sources/KokoroStudio/Views/ContentView.swift` (persist + assign)
 
-- [ ] **Step 1: Add the new-speaker pane**
+- [x] **Step 1: Add the new-speaker pane**
 
 Add a `@State private var creating = false` to `SpeakerPickerPopover` and a second view shown when `creating` is true: a `TextField` for the name, a voice `Picker` over `state`'s visible voices (pass the voice list in), and a horizontal palette swatch row (8 colors) defaulting to the auto slot but tappable to override. Replace the `onNew: () -> Void` callback with `onCreate: (_ name: String, _ voiceID: Int, _ colorIndex: Int, _ symbolIndex: Int) -> Void`.
 
@@ -996,7 +996,7 @@ let auto = SpeakerIdentity.nextFreeStyle(
     usedSymbols: Array(symbolOverrides.values))
 ```
 
-- [ ] **Step 2: Persist and assign on create**
+- [x] **Step 2: Persist and assign on create**
 
 In `EditorView`, implement the `onCreate` handler:
 
@@ -1018,12 +1018,12 @@ In `EditorView`, implement the `onCreate` handler:
 
 Wire `onCreate` to this, then clear `pendingPickerParagraph`.
 
-- [ ] **Step 3: Build and verify manually**
+- [x] **Step 3: Build and verify manually**
 
 Run: `swift build && ./scripts/build-app.sh && open "build/Kokoro Studio.app"`
 Verify: "New speaker…" → name + voice + color picker; saving tags the paragraph with the new `@Name:`, the chip + gutter use the chosen color, and the speaker now appears in the picker list with its voice. Generating audio uses the assigned voice for that speaker (confirm by ear or by checking the segment plan).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/KokoroStudio/Views/SpeakerPickerPopover.swift Sources/KokoroStudio/Views/ContentView.swift
@@ -1040,7 +1040,7 @@ The visual target from the design: a rounded, tinted background behind each `@Na
 - Create: `Sources/KokoroStudio/Views/SpeakerChipLayoutManager.swift`
 - Modify: `Sources/KokoroStudio/Views/ContentView.swift` (install the custom layout manager on the editor text view) and/or `SpeakerChipRenderer.swift`
 
-- [ ] **Step 1: Subclass NSLayoutManager to draw rounded tag backgrounds**
+- [x] **Step 1: Subclass NSLayoutManager to draw rounded tag backgrounds**
 
 Create `Sources/KokoroStudio/Views/SpeakerChipLayoutManager.swift`:
 
@@ -1074,20 +1074,20 @@ final class SpeakerChipLayoutManager: NSLayoutManager {
 
 > `enumerateTemporaryAttribute` is not a stock API name — implement the enumeration by walking `temporaryAttribute(_:atCharacterIndex:effectiveRange:)` across the range, or store chip ranges on the layout manager directly. Keep it simple: have `SpeakerChipRenderer` set the `.speakerChipColor` temporary attribute on tag ranges and store the list of `(range, color)` on the layout manager for `drawBackground` to iterate.
 
-- [ ] **Step 2: Install the custom layout manager on the editor text view**
+- [x] **Step 2: Install the custom layout manager on the editor text view**
 
 `TextEditor`'s text view uses a default layout manager. Replace it once, after locating the text view: `textView.textContainer?.replaceLayoutManager(SpeakerChipLayoutManager())`. Do this in the gutter/chip host setup. Guard so it runs once.
 
-- [ ] **Step 3: Switch the renderer to set chip color + draw pills**
+- [x] **Step 3: Switch the renderer to set chip color + draw pills**
 
 Update `SpeakerChipRenderer.apply` to also set `SpeakerChipLayoutManager.chipColorAttr` on the tag ranges (keep the foreground tint for contrast). With the custom layout manager installed, tag lines now show a rounded tinted pill.
 
-- [ ] **Step 4: Build and verify manually**
+- [x] **Step 4: Build and verify manually**
 
 Run: `swift build && ./scripts/build-app.sh && open "build/Kokoro Studio.app"`
 Verify: `@Name:` tags render inside a rounded tinted pill in the speaker's color; toggling mode off clears pills; follow-along highlighting during playback still works and does not visually fight the pills. **If alignment or redraw is unstable, revert this task — Task 7's tint is the shipped baseline.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/KokoroStudio/Views/SpeakerChipLayoutManager.swift Sources/KokoroStudio/Views/SpeakerChipRenderer.swift Sources/KokoroStudio/Views/ContentView.swift
@@ -1098,12 +1098,12 @@ git commit -m "feat: rounded speaker-chip pills via custom layout manager"
 
 ## Final verification
 
-- [ ] **Run the full test suite**
+- [x] **Run the full test suite**
 
 Run: `DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test`
 Expected: all tests pass, including the three new logic suites.
 
-- [ ] **End-to-end manual pass in the assembled app**
+- [x] **End-to-end manual pass in the assembled app**
 
 Run: `./scripts/build-app.sh && open "build/Kokoro Studio.app"`
 Verify the whole flow: toggle margin mode → gutter icons appear → click → assign existing speaker → create new speaker with voice → redundant tags auto-clean → undo works → generate audio honors per-speaker voices → toggle off returns to the plain editor.
