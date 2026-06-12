@@ -4,6 +4,15 @@ struct CaptionCue: Equatable {
     let start: Double // seconds
     let end: Double
     let text: String
+    /// Effective `@Speaker:` name, without the "@"; nil for untagged text.
+    let speaker: String?
+
+    init(start: Double, end: Double, text: String, speaker: String? = nil) {
+        self.start = start
+        self.end = end
+        self.text = text
+        self.speaker = speaker
+    }
 }
 
 enum CaptionFormat: String, CaseIterable, Identifiable {
@@ -23,7 +32,8 @@ enum CaptionWriter {
     /// Builds cue timings from per-segment synthesis results. Timing comes
     /// from actual sample counts, so cues stay exact regardless of voice or
     /// speed. Spliced pauses count toward the timeline but not cue duration.
-    static func buildCues(segments: [(text: String, sampleCount: Int, pauseAfterMs: Int)],
+    static func buildCues(segments: [(text: String, sampleCount: Int,
+                                      pauseAfterMs: Int, speaker: String?)],
                           sampleRate: Int) -> [CaptionCue] {
         var cues: [CaptionCue] = []
         var cursor = 0.0
@@ -31,7 +41,8 @@ enum CaptionWriter {
             let duration = Double(segment.sampleCount) / Double(sampleRate)
             if duration > 0, !segment.text.isEmpty {
                 cues.append(CaptionCue(start: cursor, end: cursor + duration,
-                                       text: segment.text))
+                                       text: segment.text,
+                                       speaker: segment.speaker))
             }
             cursor += duration + Double(segment.pauseAfterMs) / 1000.0
         }
@@ -45,16 +56,29 @@ enum CaptionWriter {
         cues.map { cue in
             CaptionCue(start: max(0, cue.start - offset),
                        end: min(totalDuration, max(0, cue.end - offset)),
-                       text: cue.text)
+                       text: cue.text, speaker: cue.speaker)
         }
         .filter { $0.end > $0.start }
     }
 
+    /// Caption text with a "Name: " prefix only on the cue where the speaker
+    /// changes; runs of the same speaker (and untagged cues) stay bare.
+    private static func labeledTexts(_ cues: [CaptionCue]) -> [String] {
+        var previousSpeaker: String?
+        return cues.map { cue in
+            defer { if cue.speaker != nil { previousSpeaker = cue.speaker } }
+            if let speaker = cue.speaker, speaker != previousSpeaker {
+                return "\(speaker): \(cue.text)"
+            }
+            return cue.text
+        }
+    }
+
     static func vtt(_ cues: [CaptionCue]) -> String {
         var lines = ["WEBVTT", ""]
-        for cue in cues {
+        for (cue, text) in zip(cues, labeledTexts(cues)) {
             lines.append("\(timestamp(cue.start, fraction: ".")) --> \(timestamp(cue.end, fraction: "."))")
-            lines.append(cue.text)
+            lines.append(text)
             lines.append("")
         }
         return lines.joined(separator: "\n")
@@ -62,10 +86,10 @@ enum CaptionWriter {
 
     static func srt(_ cues: [CaptionCue]) -> String {
         var lines: [String] = []
-        for (index, cue) in cues.enumerated() {
+        for (index, (cue, text)) in zip(cues, labeledTexts(cues)).enumerated() {
             lines.append("\(index + 1)")
             lines.append("\(timestamp(cue.start, fraction: ",")) --> \(timestamp(cue.end, fraction: ","))")
-            lines.append(cue.text)
+            lines.append(text)
             lines.append("")
         }
         return lines.joined(separator: "\n")

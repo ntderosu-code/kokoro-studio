@@ -148,12 +148,12 @@ enum ScriptPatcher {
         let before = Array(old[..<replacedRange.lowerBound])
         let inserted = newCues.map {
             CaptionCue(start: $0.start + insertAt, end: $0.end + insertAt,
-                       text: $0.text)
+                       text: $0.text, speaker: $0.speaker)
         }
         let after = old[replacedRange.upperBound...].map {
             CaptionCue(start: $0.start + timeDelta,
                        end: min(totalDuration, $0.end + timeDelta),
-                       text: $0.text)
+                       text: $0.text, speaker: $0.speaker)
         }
         return (before + inserted + after).filter { $0.end > $0.start }
     }

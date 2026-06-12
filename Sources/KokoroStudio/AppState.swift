@@ -836,9 +836,11 @@ final class AppState: ObservableObject {
     nonisolated static func runSegments(
         _ segments: [ScriptSegment], plan: SynthesisPlan, flag: CancellationFlag,
         onProgress: @escaping (Float) -> Void
-    ) -> (samples: [Float], results: [(text: String, sampleCount: Int, pauseAfterMs: Int)]) {
+    ) -> (samples: [Float], results: [(text: String, sampleCount: Int,
+                                       pauseAfterMs: Int, speaker: String?)]) {
         var allSamples: [Float] = []
-        var segmentResults: [(text: String, sampleCount: Int, pauseAfterMs: Int)] = []
+        var segmentResults: [(text: String, sampleCount: Int,
+                              pauseAfterMs: Int, speaker: String?)] = []
         let segmentCount = max(segments.count, 1)
         for (index, segment) in segments.enumerated() {
             if flag.isCancelled { break }
@@ -846,7 +848,7 @@ final class AppState: ObservableObject {
             if segment.text.isEmpty {
                 let silenceFrames = plan.sampleRate * segment.pauseAfterMs / 1000
                 allSamples.append(contentsOf: [Float](repeating: 0, count: silenceFrames))
-                segmentResults.append(("", 0, segment.pauseAfterMs))
+                segmentResults.append(("", 0, segment.pauseAfterMs, segment.speaker))
                 continue
             }
             let segmentSamples = plan.synthesize(segment) { progress in
@@ -855,7 +857,7 @@ final class AppState: ObservableObject {
             }
             allSamples.append(contentsOf: segmentSamples)
             segmentResults.append((segment.text, segmentSamples.count,
-                                   segment.pauseAfterMs))
+                                   segment.pauseAfterMs, segment.speaker))
             if segment.pauseAfterMs > 0, !flag.isCancelled {
                 let silenceFrames = plan.sampleRate * segment.pauseAfterMs / 1000
                 allSamples.append(contentsOf: [Float](repeating: 0, count: silenceFrames))
@@ -1194,7 +1196,8 @@ final class AppState: ObservableObject {
 
     private func finishPatch(audio: GeneratedAudio, patchPlan: PatchPlan,
                              rawChunk: [Float],
-                             results: [(text: String, sampleCount: Int, pauseAfterMs: Int)],
+                             results: [(text: String, sampleCount: Int,
+                                        pauseAfterMs: Int, speaker: String?)],
                              normalize: Bool, sourceScript: String,
                              cancelled: Bool) {
         phase = .ready
@@ -1368,7 +1371,8 @@ final class AppState: ObservableObject {
 
     private func finishGeneration(samples rawSamples: [Float], sampleRate: Int,
                                   cancelled: Bool,
-                                  segmentResults: [(text: String, sampleCount: Int, pauseAfterMs: Int)],
+                                  segmentResults: [(text: String, sampleCount: Int,
+                                                    pauseAfterMs: Int, speaker: String?)],
                                   speed: Double, isPreview: Bool = false,
                                   sourceScript: String = "") {
         phase = .ready
