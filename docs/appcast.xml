@@ -6,6 +6,17 @@
         <description>Sparkle appcast for Kokoro Studio releases.</description>
         <language>en</language>
         <item>
+            <title>1.6</title>
+            <pubDate>Fri, 12 Jun 2026 15:03:00 -0400</pubDate>
+            <link>https://github.com/ntderosu-code/kokoro-studio</link>
+            <sparkle:version>1.6</sparkle:version>
+            <sparkle:shortVersionString>1.6</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:releaseNotesLink>https://github.com/ntderosu-code/kokoro-studio/releases/tag/v1.6</sparkle:releaseNotesLink>
+            <enclosure url="https://github.com/ntderosu-code/kokoro-studio/releases/download/v1.6/KokoroStudio.zip" length="505284835" type="application/octet-stream" sparkle:edSignature="KSigQIWvlU/BMXBuH5OJ9/FbM15zZMU5ob3p1g7+0VDXpdAS0JOGv1KUkl1+ARZPKBAdntSyV1qWkSZqoYS1AQ=="/>
+        </item>
+        <item>
             <title>1.5.1</title>
             <pubDate>Fri, 12 Jun 2026 09:51:44 -0400</pubDate>
             <link>https://github.com/ntderosu-code/kokoro-studio</link>
