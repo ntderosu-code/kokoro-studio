@@ -119,6 +119,34 @@ struct ContentView: View {
             .frame(minWidth: 380, maxWidth: .infinity,
                    minHeight: 200, maxHeight: .infinity)
         .toolbar(id: "main") {
+            ToolbarItem(id: "scripts", placement: .navigation) {
+                Menu {
+                    ForEach(state.documents) { doc in
+                        Button {
+                            state.openTab(doc.id)
+                        } label: {
+                            if state.openTabIDs.contains(doc.id) {
+                                Label(doc.title, systemImage: "checkmark")
+                            } else {
+                                Text(doc.title)
+                            }
+                        }
+                    }
+                    Divider()
+                    Button("New Script", systemImage: "plus") {
+                        state.createDocument()
+                    }
+                    // ⌘T lives on the File-menu command; registering it twice
+                    // would double-fire.
+                    Button("Import Document…", systemImage: "square.and.arrow.down") {
+                        state.showingImportPanel = true
+                    }
+                } label: {
+                    Label("Scripts", systemImage: "doc.text")
+                }
+                .help("Open a script from the library")
+            }
+
             ToolbarItem(id: "profile", placement: .navigation) {
                 Menu {
                     Picker("Profile", selection: $state.currentProfileName) {
