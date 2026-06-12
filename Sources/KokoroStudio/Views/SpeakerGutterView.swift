@@ -56,8 +56,9 @@ final class SpeakerGutterView: NSView {
             path.fill()
             if let image = NSImage(systemSymbolName: symbolName,
                                    accessibilityDescription: nil) {
+                let symbolColor = SpeakerIdentity.iconForeground(on: color)
                 let cfg = NSImage.SymbolConfiguration(pointSize: 11, weight: .bold)
-                    .applying(.init(paletteColors: [.white]))
+                    .applying(.init(paletteColors: [symbolColor]))
                 let tinted = image.withSymbolConfiguration(cfg)
                 tinted?.draw(in: entry.rect.insetBy(dx: 4, dy: 4))
             }

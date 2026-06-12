@@ -133,11 +133,12 @@ struct SpeakerPickerPopover: View {
         let style = SpeakerIdentity.style(for: name,
                                           colorOverrides: colorOverrides,
                                           symbolOverrides: symbolOverrides)
+        let fill = SpeakerIdentity.displayColor(colorIndex: style.colorIndex)
         return Image(systemName: SpeakerIdentity.displaySymbol(symbolIndex: style.symbolIndex))
             .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(Color(nsColor: SpeakerIdentity.iconForeground(on: fill)))
             .frame(width: 18, height: 18)
-            .background(Color(nsColor: SpeakerIdentity.displayColor(colorIndex: style.colorIndex)))
+            .background(Color(nsColor: fill))
             .clipShape(RoundedRectangle(cornerRadius: 5))
     }
 }

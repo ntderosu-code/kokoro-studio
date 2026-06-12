@@ -33,7 +33,11 @@ enum SpeakerChipRenderer {
                                               colorOverrides: colorOverrides,
                                               symbolOverrides: symbolOverrides)
             let color = SpeakerIdentity.displayColor(colorIndex: style.colorIndex)
-            lm.addTemporaryAttribute(.foregroundColor, value: color,
+            // Text gets a contrast-assured variant (WCAG AA 4.5:1 against the
+            // pill); the pill itself keeps the full-saturation palette color.
+            let textColor = SpeakerIdentity.dynamicChipTextColor(
+                colorIndex: style.colorIndex)
+            lm.addTemporaryAttribute(.foregroundColor, value: textColor,
                                      forCharacterRange: tagRange)
             chips.append((tagRange, color))
         }
