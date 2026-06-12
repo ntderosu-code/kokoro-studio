@@ -456,6 +456,41 @@ struct EditorView: View {
         pendingPickerParagraph = paragraphIndex
     }
 
+    /// Script speakers in document order, then mapped voices not in the script.
+    private var knownSpeakers: [String] {
+        var names = ScriptSegmenter.speakerNames(in: state.script)
+        for name in state.speakerVoices.keys.sorted() where !names.contains(name) {
+            names.append(name)
+        }
+        return names
+    }
+
+    private func currentSpeaker(forParagraph index: Int) -> String {
+        let spans = ParagraphSpeakers.resolve(script: state.script)
+        guard spans.indices.contains(index) else { return ParagraphSpeakers.narratorName }
+        return spans[index].speaker
+    }
+
+    /// Applies a SpeakerTagEditor edit through the text view so the change
+    /// lands on the native undo stack as a single step.
+    private func assignSpeaker(_ speaker: String, toParagraph index: Int) {
+        guard let edit = SpeakerTagEditor.assign(
+                script: state.script, paragraphIndex: index, to: speaker),
+              let textView = EditorTextAccess.focusTextView(in: NSApp.keyWindow)
+        else { return }
+        if textView.shouldChangeText(in: edit.range,
+                                     replacementString: edit.replacement) {
+            textView.textStorage?.replaceCharacters(in: edit.range,
+                                                    with: edit.replacement)
+            textView.didChangeText()
+        }
+        state.script = textView.string   // keep the binding in sync
+        refreshChips()
+        // Gutter refresh happens via the script change driving SpeakerGutterHost.
+    }
+
+    private struct PickerTarget: Identifiable { let id: Int }
+
     var body: some View {
         HStack(spacing: 0) {
             if state.marginSpeakerMode {
@@ -464,6 +499,21 @@ struct EditorView: View {
                                   symbolOverrides: state.speakerSymbols,
                                   paragraphTapped: handleParagraphTap)
                     .frame(width: 34)
+                    .popover(item: Binding(
+                        get: { pendingPickerParagraph.map(PickerTarget.init) },
+                        set: { pendingPickerParagraph = $0?.id }
+                    ), arrowEdge: .leading) { target in
+                        SpeakerPickerPopover(
+                            knownSpeakers: knownSpeakers,
+                            currentSpeaker: currentSpeaker(forParagraph: target.id),
+                            colorOverrides: state.speakerColors,
+                            symbolOverrides: state.speakerSymbols,
+                            onPick: { name in
+                                assignSpeaker(name, toParagraph: target.id)
+                                pendingPickerParagraph = nil
+                            },
+                            onNew: {})
+                    }
             }
             editorCore
         }
