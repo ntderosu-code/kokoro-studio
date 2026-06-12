@@ -243,8 +243,8 @@ final class AppState: ObservableObject {
 
     static let voicePreviewText = "This is the sound of my voice."
 
-    @Published var previewingVoiceID: Int?
-    @Published var renderingPreviewVoiceID: Int?
+    @Published var previewingVoice: AuditionVoice?
+    @Published var renderingPreviewVoice: AuditionVoice?
     private let voicePreviewDelegate = VoicePreviewDelegate()
     private var voicePreviewPlayer: AVAudioPlayer?
 
@@ -254,56 +254,93 @@ final class AppState: ObservableObject {
             .appendingPathComponent("Kokoro Studio/VoicePreviews")
     }
 
+    /// Cache filename for one voice's preview. Kokoro keeps the historic
+    /// "v<id>" name so existing cached previews stay valid.
+    private static func previewCacheURL(for voice: AuditionVoice) -> URL {
+        let name: String
+        switch voice {
+        case .kokoro(let id): name = "v\(id)"
+        case .supertonic: name = voice.cacheLabel
+        }
+        return voicePreviewDirectory
+            .appendingPathComponent(name).appendingPathExtension("wav")
+    }
+
     /// Plays a cached "This is the sound of my voice." sample for the voice,
     /// rendering and caching it on first use. Toggles off if already playing.
-    func toggleVoicePreview(_ voiceID: Int) {
-        if previewingVoiceID == voiceID {
+    func toggleVoicePreview(_ voice: AuditionVoice) {
+        if previewingVoice == voice {
             voicePreviewPlayer?.stop()
-            previewingVoiceID = nil
+            previewingVoice = nil
             return
         }
         voicePreviewPlayer?.stop()
-        previewingVoiceID = nil
+        previewingVoice = nil
 
-        let cacheURL = Self.voicePreviewDirectory
-            .appendingPathComponent("v\(voiceID).wav")
+        let cacheURL = Self.previewCacheURL(for: voice)
         if FileManager.default.fileExists(atPath: cacheURL.path) {
-            playPreview(from: cacheURL, voiceID: voiceID)
+            playPreview(from: cacheURL, voice: voice)
             return
         }
-        guard let engine, renderingPreviewVoiceID == nil, !isGenerating else { return }
-        renderingPreviewVoiceID = voiceID
+        guard renderingPreviewVoice == nil, !isGenerating else { return }
+        let kokoroEngine = engine
+        let cachedSupertonicEngine = supertonicEngine
+        renderingPreviewVoice = voice
         Task.detached(priority: .userInitiated) {
-            let samples = engine.synthesize(text: AppState.voicePreviewText,
-                                            voiceID: voiceID, speed: 1.0,
-                                            progress: { _ in true })
-            await MainActor.run {
-                self.renderingPreviewVoiceID = nil
-                guard !samples.isEmpty else { return }
-                do {
-                    try FileManager.default.createDirectory(
-                        at: Self.voicePreviewDirectory,
-                        withIntermediateDirectories: true)
-                    try AudioExporter.write(
-                        samples: AudioProcessing.normalizePeak(samples),
-                        sampleRate: engine.sampleRate,
-                        to: cacheURL, format: .wav)
-                    self.playPreview(from: cacheURL, voiceID: voiceID)
-                } catch {
-                    self.errorMessage = "Could not render voice preview: \(error.localizedDescription)"
+            do {
+                let samples: [Float]
+                let sampleRate: Int
+                switch voice {
+                case .kokoro(let voiceID):
+                    guard let kokoroEngine else {
+                        throw KokoroEngineError.modelLoadFailed(
+                            "Kokoro engine not loaded yet")
+                    }
+                    samples = kokoroEngine.synthesize(
+                        text: AppState.voicePreviewText,
+                        voiceID: voiceID, speed: 1.0, progress: { _ in true })
+                    sampleRate = kokoroEngine.sampleRate
+                case .supertonic(let voiceID):
+                    let supertonic = try await self.loadSupertonicEngine(
+                        cached: cachedSupertonicEngine)
+                    samples = supertonic.synthesize(
+                        text: AppState.voicePreviewText,
+                        voiceID: voiceID, speed: 1.0, progress: { _ in true })
+                    sampleRate = supertonic.sampleRate
+                }
+                await MainActor.run {
+                    self.renderingPreviewVoice = nil
+                    guard !samples.isEmpty else { return }
+                    do {
+                        try FileManager.default.createDirectory(
+                            at: Self.voicePreviewDirectory,
+                            withIntermediateDirectories: true)
+                        try AudioExporter.write(
+                            samples: AudioProcessing.normalizePeak(samples),
+                            sampleRate: sampleRate,
+                            to: cacheURL, format: .wav)
+                        self.playPreview(from: cacheURL, voice: voice)
+                    } catch {
+                        self.errorMessage = "Could not render voice preview: \(error.localizedDescription)"
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.renderingPreviewVoice = nil
+                    self.errorMessage = error.localizedDescription
                 }
             }
         }
     }
 
-    private func playPreview(from url: URL, voiceID: Int) {
+    private func playPreview(from url: URL, voice: AuditionVoice) {
         guard let player = try? AVAudioPlayer(contentsOf: url) else { return }
         voicePreviewDelegate.onFinish = { [weak self] in
-            self?.previewingVoiceID = nil
+            self?.previewingVoice = nil
         }
         player.delegate = voicePreviewDelegate
         voicePreviewPlayer = player
-        previewingVoiceID = voiceID
+        previewingVoice = voice
         player.play()
     }
 

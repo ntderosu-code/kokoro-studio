@@ -75,7 +75,10 @@ final class SupertonicEngine {
 
         let sampleCount = Int(audio.pointee.n)
         guard sampleCount > 0, let samplesPointer = audio.pointee.samples else { return [] }
-        return Array(UnsafeBufferPointer(start: samplesPointer, count: sampleCount))
+        let raw = Array(UnsafeBufferPointer(start: samplesPointer, count: sampleCount))
+        // Supertonic's "s" sounds run hot; tame the sibilance band before
+        // the samples reach any consumer (generate, audition, previews).
+        return DeEsser.process(raw, sampleRate: sampleRate)
     }
 }
 

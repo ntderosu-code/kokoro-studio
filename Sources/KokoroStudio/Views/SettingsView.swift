@@ -191,7 +191,7 @@ struct VoicesSettingsTab: View {
                     Section(group.label) {
                         ForEach(group.voices) { voice in
                             HStack(spacing: 10) {
-                                VoicePreviewButton(voiceID: voice.id)
+                                VoicePreviewButton(voice: .kokoro(voice.id))
 
                                 Button {
                                     var favorites = state.favoriteVoiceIDs

@@ -19,6 +19,10 @@ struct ContentView: View {
             in: state.script,
             coveredBy: PronunciationDictionary.parse(state.pronunciationRulesText))
     }
+
+    private var heteronymSuspects: [(word: String, hint: String)] {
+        ScriptLinter.heteronymSuspects(in: state.script)
+    }
     @State private var showingExportSheet = false
     @State private var showingSaveProfile = false
     @State private var newProfileName = ""
@@ -393,38 +397,54 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .help("Estimated audio length — calibrates from your actual generations")
             }
-            if !pronunciationSuspects.isEmpty {
+            if !pronunciationSuspects.isEmpty || !heteronymSuspects.isEmpty {
                 Button {
                     showingLinter = true
                 } label: {
-                    Label("\(pronunciationSuspects.count) pronunciation flags",
+                    Label("\(pronunciationSuspects.count + heteronymSuspects.count) pronunciation flags",
                           systemImage: "exclamationmark.bubble")
                         .font(.subheadline)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.orange)
-                .help("Acronyms that may be mispronounced — click to review")
+                .help("Words that may be mispronounced — click to review")
                 .popover(isPresented: $showingLinter, arrowEdge: .bottom) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Possible pronunciation issues")
                             .font(.headline)
-                        Text("ALL-CAPS terms with no dictionary rule. Add @letters to spell them out, or @word to silence the flag.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        ForEach(pronunciationSuspects, id: \.self) { token in
-                            HStack {
-                                Text(token).font(.body.monospaced())
-                                Spacer()
-                                Button("Add…") {
-                                    showingLinter = false
-                                    quickAddWord = token
+                        if !pronunciationSuspects.isEmpty {
+                            Text("ALL-CAPS terms with no dictionary rule. Add @letters to spell them out, or @word to silence the flag.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            ForEach(pronunciationSuspects, id: \.self) { token in
+                                HStack {
+                                    Text(token).font(.body.monospaced())
+                                    Spacer()
+                                    Button("Add…") {
+                                        showingLinter = false
+                                        quickAddWord = token
+                                    }
+                                    .controlSize(.small)
                                 }
-                                .controlSize(.small)
+                            }
+                        }
+                        if !heteronymSuspects.isEmpty {
+                            Text("Context-dependent words — the engine guesses from spelling. Where it guesses wrong, write an inline override at that spot:")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            ForEach(heteronymSuspects, id: \.word) { suspect in
+                                HStack {
+                                    Text(suspect.word).font(.body.monospaced())
+                                    Spacer()
+                                    Text(suspect.hint)
+                                        .font(.caption.monospaced())
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
                     .padding(14)
-                    .frame(width: 320)
+                    .frame(width: 340)
                 }
             }
             Spacer()

@@ -14,6 +14,24 @@ final class ScriptLinterTests: XCTestCase {
         XCTAssertTrue(ScriptLinter.acronymSuspects(
             in: "Plain sentences only here. I am fine.", coveredBy: []).isEmpty)
     }
+
+    func testFlagsHeteronymsOnceCaseInsensitively() {
+        let suspects = ScriptLinter.heteronymSuspects(
+            in: "Read the chapter. She read it twice. The lead author left.")
+        XCTAssertEqual(suspects.map(\.word), ["read", "lead"])
+        XCTAssertFalse(suspects[0].hint.isEmpty)
+    }
+
+    func testHeteronymInsideInlineOverrideIsNotFlagged() {
+        XCTAssertTrue(ScriptLinter.heteronymSuspects(
+            in: "She {read|red} it yesterday.").isEmpty)
+    }
+
+    func testHeteronymAsSubstringIsNotFlagged() {
+        // "ready", "bread", "already" contain "read" but aren't heteronyms.
+        XCTAssertTrue(ScriptLinter.heteronymSuspects(
+            in: "Already prepared: the bread is ready.").isEmpty)
+    }
 }
 
 final class ModuleSplitterTests: XCTestCase {

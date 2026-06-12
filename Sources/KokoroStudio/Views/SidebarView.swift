@@ -63,7 +63,7 @@ struct SidebarView: View {
                         .labelsHidden()
                         .help("★ = recommended. Favorite or hide voices in Settings (⌘,)")
 
-                        VoicePreviewButton(voiceID: state.voiceID)
+                        VoicePreviewButton(voice: .kokoro(state.voiceID))
 
                         Button {
                             state.settingsTab = "voices"
@@ -81,13 +81,17 @@ struct SidebarView: View {
                     }
                     .help("Map @Name: script tags to voices for dialogue")
                 } else {
-                    Picker("Voice", selection: $state.supertonicVoiceID) {
-                        ForEach(SupertonicVoiceCatalog.voices) { voice in
-                            Text(voice.displayName).tag(voice.id)
+                    HStack(spacing: 6) {
+                        Picker("Voice", selection: $state.supertonicVoiceID) {
+                            ForEach(SupertonicVoiceCatalog.voices) { voice in
+                                Text(voice.displayName).tag(voice.id)
+                            }
                         }
+                        .labelsHidden()
+                        .help("Supertonic voice style — F voices are female, M voices are male")
+
+                        VoicePreviewButton(voice: .supertonic(state.supertonicVoiceID))
                     }
-                    .labelsHidden()
-                    .help("Supertonic voice style — F voices are female, M voices are male")
                 }
 
                 Button("Compare Voices…") {
@@ -189,28 +193,28 @@ struct SidebarView: View {
 /// "This is the sound of my voice." sample.
 struct VoicePreviewButton: View {
     @EnvironmentObject private var state: AppState
-    let voiceID: Int
+    let voice: AuditionVoice
 
     var body: some View {
         Button {
-            state.toggleVoicePreview(voiceID)
+            state.toggleVoicePreview(voice)
         } label: {
-            if state.renderingPreviewVoiceID == voiceID {
+            if state.renderingPreviewVoice == voice {
                 ProgressView()
                     .controlSize(.small)
                     .frame(width: 16, height: 16)
             } else {
-                Image(systemName: state.previewingVoiceID == voiceID
+                Image(systemName: state.previewingVoice == voice
                       ? "stop.circle.fill" : "play.circle")
-                    .foregroundStyle(state.previewingVoiceID == voiceID
+                    .foregroundStyle(state.previewingVoice == voice
                                      ? .primary : .secondary)
             }
         }
         .buttonStyle(.plain)
-        .disabled(state.renderingPreviewVoiceID != nil
-                  && state.renderingPreviewVoiceID != voiceID)
+        .disabled(state.renderingPreviewVoice != nil
+                  && state.renderingPreviewVoice != voice)
         .help("Hear this voice: “\(AppState.voicePreviewText)”")
-        .accessibilityLabel("Preview \(VoiceCatalog.voice(forID: voiceID).humanName)")
+        .accessibilityLabel("Preview \(voice.label)")
     }
 }
 

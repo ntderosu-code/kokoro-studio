@@ -27,6 +27,33 @@ enum ScriptLinter {
         }
         return suspects
     }
+
+    /// Words whose pronunciation depends on context (heteronyms). The
+    /// engines guess from spelling alone, so the script author has to
+    /// disambiguate with an inline override where the guess is wrong.
+    static let heteronymHints: [(word: String, hint: String)] = [
+        ("read", "past tense: {read|red}"),
+        ("lead", "the metal / past tense: {lead|led}"),
+        ("live", "the adjective: {live|lyve}"),
+        ("wind", "to coil or turn: {wind|wynd}"),
+        ("tear", "to rip: {tear|tare}"),
+        ("wound", "coiled or turned: {wound|wownd}"),
+        ("bow", "to bend, or a ship's bow: {bow|bough}"),
+        ("bass", "the fish: {bass|bass}"),
+    ]
+
+    /// Heteronyms present in the script (deduped, hint order). Words already
+    /// wrapped in an inline `{word|sounds-like}` override are not flagged.
+    static func heteronymSuspects(in script: String)
+        -> [(word: String, hint: String)] {
+        // Inline-override spans are author-resolved; remove them first.
+        let stripped = script.replacing(#/\{[^{}|]+\|[^{}]+\}/#, with: " ")
+            .lowercased()
+        return heteronymHints.filter { entry in
+            stripped.firstMatch(
+                of: try! Regex("\\b\(entry.word)\\b")) != nil
+        }
+    }
 }
 
 // MARK: - Module splitting
