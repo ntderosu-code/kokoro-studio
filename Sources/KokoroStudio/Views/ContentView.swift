@@ -208,6 +208,20 @@ struct ContentView: View {
                 }
             }
 
+            ToolbarItem(id: "margin-speakers") {
+                Button {
+                    state.marginSpeakerMode.toggle()
+                } label: {
+                    Label("Speaker Margins",
+                          systemImage: state.marginSpeakerMode
+                              ? "person.crop.rectangle.badge.plus.fill"
+                              : "person.crop.rectangle.badge.plus")
+                }
+                .help(state.marginSpeakerMode
+                      ? "Hide the speaker margin"
+                      : "Show speaker icons in the margin to assign voices per paragraph")
+            }
+
             // Output action anchors the trailing edge
             ToolbarItem(id: "export") {
                 Button("Export", systemImage: "square.and.arrow.up") {
