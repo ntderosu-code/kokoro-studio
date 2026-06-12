@@ -7,6 +7,8 @@ struct ScriptTabBar: View {
     @State private var renameTarget: ScriptDocumentMeta?
     @State private var renameText = ""
     @State private var deleteTarget: ScriptDocumentMeta?
+    @State private var hoveredTabID: UUID?
+    @State private var hoveringNewTabButton = false
 
     private var openDocuments: [ScriptDocumentMeta] {
         state.openTabIDs.compactMap { id in
@@ -27,9 +29,15 @@ struct ScriptTabBar: View {
                     } label: {
                         Image(systemName: "plus")
                             .frame(width: 26, height: 24)
+                            .background(
+                                hoveringNewTabButton ? AnyShapeStyle(.quaternary)
+                                                     : AnyShapeStyle(.clear),
+                                in: RoundedRectangle(cornerRadius: 6))
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .onHover { hoveringNewTabButton = $0 }
+                    .animation(.easeOut(duration: 0.12), value: hoveringNewTabButton)
                     .help("New script (⌘T)")
                 }
                 .padding(.horizontal, 6)
@@ -69,6 +77,8 @@ struct ScriptTabBar: View {
 
     private func tab(for doc: ScriptDocumentMeta) -> some View {
         let isActive = doc.id == state.currentDocumentID
+        let isHovered = doc.id == hoveredTabID
+        let shape = UnevenRoundedRectangle(topLeadingRadius: 8, topTrailingRadius: 8)
         return HStack(spacing: 4) {
             Button {
                 state.closeTab(doc.id)
@@ -78,24 +88,48 @@ struct ScriptTabBar: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .opacity(isActive ? 1 : 0.4)
+            .opacity(isActive || isHovered ? 1 : 0.4)
             .help("Close tab (⇧⌘W)")
-            Text(doc.title)
-                .lineLimit(1)
-                .font(.callout)
-                .foregroundStyle(isActive ? .primary : .secondary)
+            // A real button so tabs are focusable and operable from the
+            // keyboard, not just clickable.
+            Button {
+                state.selectDocument(doc.id)
+            } label: {
+                Text(doc.title)
+                    .lineLimit(1)
+                    .font(.callout)
+                    // Primary on every tab: secondary text on the recessed
+                    // gray fill falls below 4.5:1. Weight marks the active
+                    // tab so state isn't conveyed by fill alone.
+                    .fontWeight(isActive ? .semibold : .regular)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         .frame(maxWidth: 180)
-        .background(
-            UnevenRoundedRectangle(topLeadingRadius: 8, topTrailingRadius: 8)
-                .fill(isActive
-                      ? Color(nsColor: .textBackgroundColor)
-                      : Color(nsColor: .windowBackgroundColor).opacity(0.6))
-        )
+        .background(shape.fill(tabFill(isActive: isActive, isHovered: isHovered)))
+        .overlay {
+            // Hairline keeps inactive tabs legible against the pane; the
+            // active tab stays borderless so it fuses with the editor card.
+            if !isActive {
+                shape.strokeBorder(.quaternary)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture { state.selectDocument(doc.id) }
+        .onHover { hovering in
+            if hovering {
+                hoveredTabID = doc.id
+            } else if hoveredTabID == doc.id {
+                hoveredTabID = nil
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: hoveredTabID)
+        .animation(.easeOut(duration: 0.15), value: state.currentDocumentID)
         .contextMenu {
             Button("Rename…") {
                 renameText = doc.title
@@ -111,5 +145,15 @@ struct ScriptTabBar: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Script tab: \(doc.title)")
         .accessibilityAddTraits(isActive ? [.isSelected] : [])
+    }
+
+    /// Active fuses with the editor card; inactive sits recessed against
+    /// the pane; hover lifts an inactive tab partway toward active.
+    private func tabFill(isActive: Bool, isHovered: Bool) -> Color {
+        if isActive { return Color(nsColor: .textBackgroundColor) }
+        let recessed = NSColor.underPageBackgroundColor
+        guard isHovered else { return Color(nsColor: recessed) }
+        let lifted = recessed.blended(withFraction: 0.4, of: .textBackgroundColor)
+        return Color(nsColor: lifted ?? recessed)
     }
 }
