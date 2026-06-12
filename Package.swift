@@ -4,11 +4,18 @@ import PackageDescription
 let package = Package(
     name: "KokoroStudio",
     platforms: [.macOS(.v14)],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle",
+                 from: "2.9.3"),
+    ],
     targets: [
         .systemLibrary(name: "CSherpaOnnx", path: "Sources/CSherpaOnnx"),
         .executableTarget(
             name: "KokoroStudio",
-            dependencies: ["CSherpaOnnx"],
+            dependencies: [
+                "CSherpaOnnx",
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
             exclude: ["CLAUDE.md", "Views/CLAUDE.md"],
             linkerSettings: [
                 .unsafeFlags([

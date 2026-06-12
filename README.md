@@ -104,6 +104,27 @@ DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test
 Release builds (`./scripts/build-app.sh --release`) sign with Developer ID
 and notarize; see the script header for the required keychain profile.
 
+### Sparkle updates
+
+Kokoro Studio uses [Sparkle](https://sparkle-project.org/) for installed-app
+update checks. The updater starts only when the assembled app bundle includes
+both a Sparkle appcast URL and EdDSA public key:
+
+```bash
+SPARKLE_PUBLIC_ED_KEY="..." \
+./scripts/build-app.sh --release
+```
+
+By default, release builds use the GitHub Pages appcast at
+`https://ntderosu-code.github.io/kokoro-studio/appcast.xml`. Override it with
+`SPARKLE_FEED_URL` only if the feed moves.
+
+Generate the key once with Sparkle's `generate_keys` tool, keep the private key
+safe, and publish signed archives/appcasts with `generate_appcast`. Optional
+release settings are `SPARKLE_ENABLE_AUTOMATIC_CHECKS` and
+`SPARKLE_AUTOMATICALLY_UPDATE`; leave them unset to use Sparkle's consent
+prompt/defaults. `SPARKLE_VERIFY_BEFORE_EXTRACTION` defaults to `true`.
+
 ## Acknowledgements
 
 Kokoro Studio is a thin GUI over excellent open source work:

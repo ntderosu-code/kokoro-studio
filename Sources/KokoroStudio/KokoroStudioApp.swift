@@ -24,6 +24,7 @@ struct HelpCommands: Commands {
 @main
 struct KokoroStudioApp: App {
     @StateObject private var state = AppState()
+    private let appUpdater = AppUpdater()
 
     var body: some Scene {
         WindowGroup("Kokoro Studio") {
@@ -45,6 +46,11 @@ struct KokoroStudioApp: App {
             // focused text view's native find bar.
             TextEditingCommands()
             HelpCommands(state: state)
+            CommandGroup(after: .appInfo) {
+                if let updater = appUpdater.updater {
+                    CheckForUpdatesView(updater: updater)
+                }
+            }
             CommandGroup(after: .newItem) {
                 Button("Import Document…") {
                     state.showingImportPanel = true

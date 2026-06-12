@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Kokoro Studio Updates</title>
+        <link>https://github.com/ntderosu-code/kokoro-studio/releases</link>
+        <description>Sparkle appcast for Kokoro Studio releases.</description>
+        <language>en</language>
+        <item>
+            <title>1.5</title>
+            <pubDate>Thu, 11 Jun 2026 20:11:55 -0400</pubDate>
+            <link>https://github.com/ntderosu-code/kokoro-studio</link>
+            <sparkle:version>1.5</sparkle:version>
+            <sparkle:shortVersionString>1.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/ntderosu-code/kokoro-studio/releases/download/v1.5/KokoroStudio.zip" length="493329049" type="application/octet-stream" sparkle:edSignature="EOU/3EXqRKxkvkp/c/5doVPEftPNyTCy2NOVQ1F1a4oTxOaXDQo++vCFrHNngS23rTy2uU6mOQdQsGHTgtTHDg=="/>
+        </item>
+    </channel>
+</rss>
