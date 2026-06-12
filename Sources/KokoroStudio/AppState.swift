@@ -791,6 +791,8 @@ final class AppState: ObservableObject {
             }
             return SynthesisPlan(
                 synthesize: { segment, onProgress in
+                    // "Narrator" (and any unmapped speaker) intentionally has no
+                    // speakerMap entry, so it falls through to the default voice.
                     let segmentVoice = segment.speaker
                         .flatMap { speakerMap[$0] } ?? voice
                     let speakerSpeed = segment.speaker
