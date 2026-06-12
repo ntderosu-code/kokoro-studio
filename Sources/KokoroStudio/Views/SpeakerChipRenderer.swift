@@ -10,9 +10,14 @@ enum SpeakerChipRenderer {
                       colorOverrides: [String: Int],
                       symbolOverrides: [String: Int],
                       in textView: NSTextView?) {
-        guard let textView, let lm = textView.layoutManager else { return }
+        guard let textView else { return }
+        if enabled { installPillLayoutManagerIfNeeded(on: textView) }
+        guard let lm = textView.layoutManager else { return }
         let full = NSRange(location: 0, length: (textView.string as NSString).length)
         lm.removeTemporaryAttribute(.foregroundColor, forCharacterRange: full)
+        let pillManager = lm as? SpeakerChipLayoutManager
+        var chips: [(range: NSRange, color: NSColor)] = []
+        defer { pillManager?.chips = chips }
 
         guard enabled else { return }
         let ns = script as NSString
@@ -30,6 +35,16 @@ enum SpeakerChipRenderer {
             let color = SpeakerIdentity.displayColor(colorIndex: style.colorIndex)
             lm.addTemporaryAttribute(.foregroundColor, value: color,
                                      forCharacterRange: tagRange)
+            chips.append((tagRange, color))
         }
+    }
+
+    /// Swap in the pill-drawing layout manager once. The editor already runs
+    /// on TextKit 1 (FollowAlongHighlighter touches `layoutManager` too), so
+    /// the replacement keeps the same text storage and container.
+    private static func installPillLayoutManagerIfNeeded(on textView: NSTextView) {
+        guard let container = textView.textContainer,
+              !(textView.layoutManager is SpeakerChipLayoutManager) else { return }
+        container.replaceLayoutManager(SpeakerChipLayoutManager())
     }
 }
