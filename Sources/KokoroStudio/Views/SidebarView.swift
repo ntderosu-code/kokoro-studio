@@ -29,22 +29,6 @@ struct SidebarView: View {
         .help(help)
     }
 
-    private func chooseVoiceSample() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.audio]
-        panel.message = "Choose a short, clean voice recording (5–15s) to clone"
-        if panel.runModal() == .OK, let url = panel.url {
-            state.pocketVoicePath = url.path
-        }
-    }
-
-    private var pocketVoiceName: String {
-        guard let url = state.pocketVoiceURL else { return "None" }
-        return url.deletingPathExtension().lastPathComponent.capitalized
-    }
-
     var body: some View {
         Form {
             Section("Engine") {
@@ -57,8 +41,8 @@ struct SidebarView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                if state.engineKind == .pocket {
-                    Text("Pocket TTS clones the voice from a short audio sample.")
+                if state.engineKind == .supertonic {
+                    Text("Supertonic is a fast multilingual engine with ten built-in voices.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -97,23 +81,13 @@ struct SidebarView: View {
                     }
                     .help("Map @Name: script tags to voices for dialogue")
                 } else {
-                    LabeledContent("Sample") {
-                        Text(pocketVoiceName)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .foregroundStyle(.secondary)
-                            .help(state.pocketVoiceURL?.path ?? "")
+                    Picker("Voice", selection: $state.supertonicVoiceID) {
+                        ForEach(SupertonicVoiceCatalog.voices) { voice in
+                            Text(voice.displayName).tag(voice.id)
+                        }
                     }
-                    Button("Choose Voice Sample…") {
-                        chooseVoiceSample()
-                    }
-                    Button("Use Built-in Voice (Bria)") {
-                        state.pocketVoicePath = ""
-                    }
-                    .disabled(state.pocketVoicePath.isEmpty)
-                    Text("5–15 seconds of clean speech works best.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .labelsHidden()
+                    .help("Supertonic voice style — F voices are female, M voices are male")
                 }
 
                 Button("Compare Voices…") {
@@ -332,8 +306,8 @@ struct CreditsView: View {
     private let credits: [Credit] = [
         Credit(name: "Kokoro-82M", detail: "TTS model by hexgrad · Apache-2.0",
                url: "https://huggingface.co/hexgrad/Kokoro-82M"),
-        Credit(name: "Pocket TTS", detail: "Voice-cloning model by Kyutai · CC-BY-4.0",
-               url: "https://github.com/kyutai-labs/pocket-tts"),
+        Credit(name: "Supertonic", detail: "Fast on-device TTS by Supertone · MIT",
+               url: "https://github.com/supertone-inc/supertonic"),
         Credit(name: "sherpa-onnx", detail: "On-device inference runtime by k2-fsa · Apache-2.0",
                url: "https://github.com/k2-fsa/sherpa-onnx"),
         Credit(name: "ONNX Runtime", detail: "Inference engine by Microsoft · MIT",

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Kokoro Studio — a fully offline macOS TTS app (SwiftUI, macOS 14+) over the Kokoro and Pocket TTS models via sherpa-onnx. Pure SwiftPM executable; there is no Xcode project. Built for instructional-content narration: pause control, pronunciation dictionary, captions, module splitting.
+Kokoro Studio — a fully offline macOS TTS app (SwiftUI, macOS 14+) over the Kokoro and Supertonic TTS models via sherpa-onnx. Pure SwiftPM executable; there is no Xcode project. Built for instructional-content narration: pause control, pronunciation dictionary, captions, module splitting.
 
 ## Commands
 
@@ -20,7 +20,7 @@ DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter ScriptPatcherTests 
 ./scripts/build-app.sh --release   # Developer ID sign + notarize + staple (needs keychain creds)
 ```
 
-- Engine tests (`KokoroEngineTests`, `PocketEngineTests`) load the real models — they run in seconds locally but fail without `vendor/`.
+- Engine tests (`KokoroEngineTests`, `SupertonicEngineTests`) load the real models — they run in seconds locally but fail without `vendor/`.
 - The app's **Info.plist (including the version number and NSServices entries) lives inline in `scripts/build-app.sh`** — bump versions there.
 - Features that need a bundle (macOS Services, UserNotifications) only work from the assembled `.app`, never the bare binary; code guards on `Bundle.main.bundleIdentifier`.
 
@@ -32,7 +32,7 @@ DYLD_LIBRARY_PATH=vendor/sherpa-onnx/lib swift test --filter ScriptPatcherTests 
 
 1. `InlineOverrides` (`{word|sounds-like}`) → `PronunciationDictionary` → `NumberNormalizer`
 2. `ScriptSegmenter.segment` — splits on pauses, `@Speaker:` tags, `#` headings, `[pause:N]`, `*emphasis*` (emphasis = breath + 0.92× speed, **not** louder)
-3. `makeSynthesisPlan` picks the engine (`KokoroEngine` eager-loaded, `PocketEngine` lazy) and returns a per-segment synthesize closure
+3. `makeSynthesisPlan` picks the engine (`KokoroEngine` eager-loaded, `SupertonicEngine` lazy) and returns a per-segment synthesize closure
 4. `AppState.runSegments` splices silence between segments and records per-segment sample counts
 5. `AudioProcessing.finalize` (silence trim → −1 dBFS peak → micro fades); optional `LoudnessNormalizer` LUFS pass at export only
 

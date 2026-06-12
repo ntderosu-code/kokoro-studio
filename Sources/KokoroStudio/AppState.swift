@@ -33,9 +33,9 @@ final class CancellationFlag: @unchecked Sendable {
 }
 
 enum TTSEngineKind: String, CaseIterable, Identifiable {
-    case kokoro, pocket
+    case kokoro, supertonic
     var id: String { rawValue }
-    var label: String { self == .kokoro ? "Kokoro" : "Pocket (cloning)" }
+    var label: String { self == .kokoro ? "Kokoro" : "Supertonic" }
 }
 
 @MainActor
@@ -154,7 +154,8 @@ final class AppState: ObservableObject {
     }
 
     @AppStorage("engineKind") private var engineKindRaw = TTSEngineKind.kokoro.rawValue
-    @AppStorage("pocketVoicePath") var pocketVoicePath = ""
+    @AppStorage("supertonicVoiceID") var supertonicVoiceID
+        = SupertonicVoiceCatalog.defaultVoiceID
     @AppStorage("normalizeLoudness") var normalizeLoudness = true
     @AppStorage("loudnessPreset") private var loudnessPresetRaw
         = LoudnessPreset.lms.rawValue
@@ -225,7 +226,7 @@ final class AppState: ObservableObject {
     }
 
     private var engine: KokoroEngine?
-    private var pocketEngine: PocketEngine?
+    private var supertonicEngine: SupertonicEngine?
     private var currentCancellation: CancellationFlag?
 
     var isGenerating: Bool {
@@ -542,35 +543,18 @@ final class AppState: ObservableObject {
                                               key: key, voice: voice)
                 }
             }
-        case .pocket:
-            let referenceURL = pocketVoiceURL
-            let cachedPocketEngine = pocketEngine
+        case .supertonic(let voiceID):
+            let cachedEngine = supertonicEngine
             Task.detached(priority: .userInitiated) {
                 do {
-                    let pocket: PocketEngine
-                    if let cachedPocketEngine {
-                        pocket = cachedPocketEngine
-                    } else {
-                        guard let directory = AppState.locatePocketDirectory() else {
-                            throw KokoroEngineError.modelLoadFailed(
-                                "Pocket TTS model folder not found in the app bundle")
-                        }
-                        pocket = try PocketEngine(modelDirectory: directory)
-                        await MainActor.run { self.pocketEngine = pocket }
-                    }
-                    guard let referenceURL else {
-                        throw KokoroEngineError.modelLoadFailed(
-                            "no voice sample selected for Pocket TTS")
-                    }
-                    let reference = try ReferenceAudioLoader.load(url: referenceURL)
-                    let samples = pocket.synthesize(
-                        text: processed,
-                        referenceAudio: reference.samples,
-                        referenceSampleRate: reference.sampleRate,
+                    let supertonic = try await self.loadSupertonicEngine(
+                        cached: cachedEngine)
+                    let samples = supertonic.synthesize(
+                        text: processed, voiceID: voiceID,
                         speed: speedValue, progress: { _ in true })
                     await MainActor.run {
                         self.finishAuditionRender(samples: samples,
-                                                  sampleRate: pocket.sampleRate,
+                                                  sampleRate: supertonic.sampleRate,
                                                   key: key, voice: voice)
                     }
                 } catch {
@@ -581,6 +565,19 @@ final class AppState: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Returns the cached Supertonic engine or loads it from the bundle.
+    private nonisolated func loadSupertonicEngine(
+        cached: SupertonicEngine?) async throws -> SupertonicEngine {
+        if let cached { return cached }
+        guard let directory = AppState.locateSupertonicDirectory() else {
+            throw KokoroEngineError.modelLoadFailed(
+                "Supertonic model folder not found in the app bundle")
+        }
+        let engine = try SupertonicEngine(modelDirectory: directory)
+        await MainActor.run { self.supertonicEngine = engine }
+        return engine
     }
 
     private func finishAuditionRender(samples: [Float], sampleRate: Int,
@@ -618,8 +615,9 @@ final class AppState: ObservableObject {
         case .kokoro(let id):
             engineKind = .kokoro
             voiceID = id
-        case .pocket:
-            engineKind = .pocket
+        case .supertonic(let id):
+            engineKind = .supertonic
+            supertonicVoiceID = id
         }
     }
 
@@ -642,8 +640,8 @@ final class AppState: ObservableObject {
         }
         // The audition path already renders one-off text with the current
         // voice and plays it without touching the editor.
-        let voice: AuditionVoice = engineKind == .pocket
-            ? .pocket : .kokoro(voiceID)
+        let voice: AuditionVoice = engineKind == .supertonic
+            ? .supertonic(supertonicVoiceID) : .kokoro(voiceID)
         toggleAudition(text: String(cleaned.prefix(2000)), voice: voice)
     }
 
@@ -719,20 +717,10 @@ final class AppState: ObservableObject {
                        marker: "model.onnx")
     }
 
-    nonisolated static func locatePocketDirectory() -> URL? {
-        locateResource(bundleName: "pocket", developmentPath: "vendor/pocket",
-                       marker: "lm_main.int8.onnx")
-    }
-
-    /// The reference clip whose voice Pocket TTS clones. Falls back to the
-    /// bundled "Bria" sample.
-    var pocketVoiceURL: URL? {
-        if !pocketVoicePath.isEmpty,
-           FileManager.default.fileExists(atPath: pocketVoicePath) {
-            return URL(fileURLWithPath: pocketVoicePath)
-        }
-        return Self.locatePocketDirectory()?
-            .appendingPathComponent("test_wavs/bria.wav")
+    nonisolated static func locateSupertonicDirectory() -> URL? {
+        locateResource(bundleName: "supertonic",
+                       developmentPath: "vendor/supertonic",
+                       marker: "voice.bin")
     }
 
     func loadModel() {
@@ -785,16 +773,16 @@ final class AppState: ObservableObject {
         let speakerMap = speakerVoices
         let speakerSpeedMap = speakerSpeeds
         let speedValue = Float(speed)
-        let voiceReferenceURL = pocketVoiceURL
         let kokoroEngine = engine
-        let cachedPocketEngine = pocketEngine
+        let cachedSupertonicEngine = supertonicEngine
+        let supertonicVoice = supertonicVoiceID
 
         Task.detached(priority: .userInitiated) {
             do {
                 let plan = try await self.makeSynthesisPlan(
                     kind: kind, kokoroEngine: kokoroEngine,
-                    cachedPocketEngine: cachedPocketEngine,
-                    voiceReferenceURL: voiceReferenceURL, voice: voice,
+                    cachedSupertonicEngine: cachedSupertonicEngine,
+                    supertonicVoice: supertonicVoice, voice: voice,
                     speakerMap: speakerMap, speakerSpeedMap: speakerSpeedMap,
                     speedValue: speedValue)
                 let (samples, results) = AppState.runSegments(
@@ -831,11 +819,11 @@ final class AppState: ObservableObject {
         let sampleRate: Int
     }
 
-    /// Builds the engine-specific segment synthesizer; loads Pocket lazily.
+    /// Builds the engine-specific segment synthesizer; loads Supertonic lazily.
     private func makeSynthesisPlan(kind: TTSEngineKind,
                                    kokoroEngine: KokoroEngine?,
-                                   cachedPocketEngine: PocketEngine?,
-                                   voiceReferenceURL: URL?,
+                                   cachedSupertonicEngine: SupertonicEngine?,
+                                   supertonicVoice: Int,
                                    voice: Int,
                                    speakerMap: [String: Int],
                                    speakerSpeedMap: [String: Double],
@@ -859,32 +847,21 @@ final class AppState: ObservableObject {
                                                    progress: onProgress)
                 },
                 sampleRate: kokoroEngine.sampleRate)
-        case .pocket:
-            let pocket: PocketEngine
-            if let cachedPocketEngine {
-                pocket = cachedPocketEngine
-            } else {
-                guard let directory = AppState.locatePocketDirectory() else {
-                    throw KokoroEngineError.modelLoadFailed(
-                        "Pocket TTS model folder not found in the app bundle")
-                }
-                pocket = try PocketEngine(modelDirectory: directory)
-                await MainActor.run { self.pocketEngine = pocket }
-            }
-            guard let voiceReferenceURL else {
-                throw KokoroEngineError.modelLoadFailed(
-                    "no voice sample selected for Pocket TTS")
-            }
-            let reference = try ReferenceAudioLoader.load(url: voiceReferenceURL)
+        case .supertonic:
+            let supertonic = try await loadSupertonicEngine(
+                cached: cachedSupertonicEngine)
             return SynthesisPlan(
                 synthesize: { segment, onProgress in
-                    pocket.synthesize(text: segment.text,
-                                      referenceAudio: reference.samples,
-                                      referenceSampleRate: reference.sampleRate,
-                                      speed: speedValue * segment.speedMultiplier,
-                                      progress: onProgress)
+                    // One voice for the whole script; @Speaker: tags still
+                    // honor per-speaker speeds.
+                    let speakerSpeed = segment.speaker
+                        .flatMap { speakerSpeedMap[$0] }.map(Float.init) ?? speedValue
+                    return supertonic.synthesize(
+                        text: segment.text, voiceID: supertonicVoice,
+                        speed: speakerSpeed * segment.speedMultiplier,
+                        progress: onProgress)
                 },
-                sampleRate: pocket.sampleRate)
+                sampleRate: supertonic.sampleRate)
         }
     }
 
@@ -1070,17 +1047,14 @@ final class AppState: ObservableObject {
             guard let data = $0.speakerVoicesJSON.data(using: .utf8) else { return nil }
             return try? JSONDecoder().decode([String: Int].self, from: data)
         } ?? speakerVoices
-        let referenceURL: URL? = profile.map {
-            $0.pocketVoicePath.isEmpty ? pocketVoiceURL
-                : URL(fileURLWithPath: $0.pocketVoicePath)
-        } ?? pocketVoiceURL
+        let supertonicVoice = profile?.supertonicVoiceID ?? supertonicVoiceID
 
         let flag = CancellationFlag()
         currentCancellation = flag
         let plan = try await makeSynthesisPlan(
             kind: kind, kokoroEngine: engine,
-            cachedPocketEngine: pocketEngine,
-            voiceReferenceURL: referenceURL, voice: voice,
+            cachedSupertonicEngine: supertonicEngine,
+            supertonicVoice: supertonicVoice, voice: voice,
             speakerMap: speakerMap, speakerSpeedMap: speakerSpeeds,
             speedValue: speedValue)
 
@@ -1212,17 +1186,17 @@ final class AppState: ObservableObject {
         let speakerMap = speakerVoices
         let speakerSpeedMap = speakerSpeeds
         let speedValue = Float(speed)
-        let voiceReferenceURL = pocketVoiceURL
         let kokoroEngine = engine
-        let cachedPocketEngine = pocketEngine
+        let cachedSupertonicEngine = supertonicEngine
+        let supertonicVoice = supertonicVoiceID
         let normalize = normalizeLoudness
 
         Task.detached(priority: .userInitiated) {
             do {
                 let plan = try await self.makeSynthesisPlan(
                     kind: kind, kokoroEngine: kokoroEngine,
-                    cachedPocketEngine: cachedPocketEngine,
-                    voiceReferenceURL: voiceReferenceURL, voice: voice,
+                    cachedSupertonicEngine: cachedSupertonicEngine,
+                    supertonicVoice: supertonicVoice, voice: voice,
                     speakerMap: speakerMap, speakerSpeedMap: speakerSpeedMap,
                     speedValue: speedValue)
                 let (rawChunk, results) = AppState.runSegments(
@@ -1331,9 +1305,9 @@ final class AppState: ObservableObject {
         let speakerMap = speakerVoices
         let speakerSpeedMap = speakerSpeeds
         let speedValue = Float(speed)
-        let voiceReferenceURL = pocketVoiceURL
         let kokoroEngine = engine
-        let cachedPocketEngine = pocketEngine
+        let cachedSupertonicEngine = supertonicEngine
+        let supertonicVoice = supertonicVoiceID
         let format = exportFormat
         let captions = captionFormat
         let normalize = normalizeLoudness
@@ -1345,8 +1319,8 @@ final class AppState: ObservableObject {
             do {
                 let plan = try await self.makeSynthesisPlan(
                     kind: kind, kokoroEngine: kokoroEngine,
-                    cachedPocketEngine: cachedPocketEngine,
-                    voiceReferenceURL: voiceReferenceURL, voice: voice,
+                    cachedSupertonicEngine: cachedSupertonicEngine,
+                    supertonicVoice: supertonicVoice, voice: voice,
                     speakerMap: speakerMap, speakerSpeedMap: speakerSpeedMap,
                     speedValue: speedValue)
                 var written: [URL] = []
@@ -1541,7 +1515,7 @@ final class AppState: ObservableObject {
 
     func currentProfile() -> Profile {
         Profile(engineKind: engineKind.rawValue, voiceID: voiceID,
-                pocketVoicePath: pocketVoicePath, speed: speed,
+                speed: speed,
                 paragraphPauseMs: paragraphPauseMs,
                 sentencePauseMs: sentencePauseMs,
                 clausePauseMs: clausePauseMs,
@@ -1553,13 +1527,15 @@ final class AppState: ObservableObject {
                 speakerVoicesJSON: speakerVoicesJSON,
                 numberPreset: numberPreset.rawValue,
                 loudnessPreset: loudnessPreset.rawValue,
-                customLoudnessLUFS: customLoudnessLUFS)
+                customLoudnessLUFS: customLoudnessLUFS,
+                supertonicVoiceID: supertonicVoiceID)
     }
 
     func apply(_ profile: Profile) {
         engineKind = TTSEngineKind(rawValue: profile.engineKind) ?? .kokoro
         voiceID = profile.voiceID
-        pocketVoicePath = profile.pocketVoicePath
+        supertonicVoiceID = profile.supertonicVoiceID
+            ?? SupertonicVoiceCatalog.defaultVoiceID
         speed = profile.speed
         paragraphPauseMs = profile.paragraphPauseMs
         sentencePauseMs = profile.sentencePauseMs

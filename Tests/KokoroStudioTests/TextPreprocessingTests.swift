@@ -169,12 +169,13 @@ final class ProfileStoreTests: XCTestCase {
         let name = "test-profile-\(UUID().uuidString)"
         defer { ProfileStore.delete(name: name) }
         let profile = Profile(engineKind: "kokoro", voiceID: 7,
-                              pocketVoicePath: "", speed: 1.2,
+                              speed: 1.2,
                               paragraphPauseMs: 450, sentencePauseMs: 200,
                               clausePauseMs: 50, headingPauseMs: 900,
                               pronunciationRules: "APA = @letters",
                               captionFormat: "vtt", normalizeLoudness: true,
-                              exportFormat: "m4a", speakerVoicesJSON: "{\"Maya\":2}")
+                              exportFormat: "m4a", speakerVoicesJSON: "{\"Maya\":2}",
+                              supertonicVoiceID: 6)
         try ProfileStore.save(profile, name: name)
         XCTAssertTrue(ProfileStore.list().contains(name))
         XCTAssertEqual(ProfileStore.load(name: name), profile)

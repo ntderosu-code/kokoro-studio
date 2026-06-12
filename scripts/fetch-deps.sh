@@ -27,14 +27,14 @@ if [ ! -d "vendor/model" ]; then
   rm "vendor/${MODEL_ARCHIVE}"
 fi
 
-POCKET_ARCHIVE="sherpa-onnx-pocket-tts-int8-2026-01-26.tar.bz2"
-if [ ! -d "vendor/pocket" ]; then
-  echo "Fetching Pocket TTS model (~100MB)..."
-  curl -L -o "vendor/${POCKET_ARCHIVE}" \
-    "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/${POCKET_ARCHIVE}"
-  tar xf "vendor/${POCKET_ARCHIVE}" -C vendor
-  mv vendor/sherpa-onnx-pocket-tts-int8-2026-01-26 vendor/pocket
-  rm "vendor/${POCKET_ARCHIVE}"
+SUPERTONIC_ARCHIVE="sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2"
+if [ ! -d "vendor/supertonic" ]; then
+  echo "Fetching Supertonic 3 model (~140MB)..."
+  curl -L -o "vendor/${SUPERTONIC_ARCHIVE}" \
+    "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/${SUPERTONIC_ARCHIVE}"
+  tar xf "vendor/${SUPERTONIC_ARCHIVE}" -C vendor
+  mv vendor/sherpa-onnx-supertonic-3-tts-int8-2026-05-11 vendor/supertonic
+  rm "vendor/${SUPERTONIC_ARCHIVE}"
 fi
 
-echo "Done. vendor/sherpa-onnx, vendor/model, and vendor/pocket ready."
+echo "Done. vendor/sherpa-onnx, vendor/model, and vendor/supertonic ready."

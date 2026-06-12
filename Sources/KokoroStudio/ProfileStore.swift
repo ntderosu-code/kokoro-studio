@@ -5,7 +5,6 @@ import Foundation
 struct Profile: Codable, Equatable {
     var engineKind: String
     var voiceID: Int
-    var pocketVoicePath: String
     var speed: Double
     var paragraphPauseMs: Int
     var sentencePauseMs: Int
@@ -21,6 +20,10 @@ struct Profile: Codable, Equatable {
     // Added after v1.4 — optional so older profile files still decode.
     var loudnessPreset: String? = nil
     var customLoudnessLUFS: Double? = nil
+    // Added in v1.6 when Supertonic replaced Pocket TTS — optional so
+    // older profile files still decode. (Their pocketVoicePath key is
+    // simply ignored.)
+    var supertonicVoiceID: Int? = nil
 }
 
 enum ProfileStore {

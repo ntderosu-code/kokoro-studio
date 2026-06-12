@@ -1,15 +1,16 @@
 import Foundation
 
 /// One side of an A/B voice comparison (#32): a Kokoro catalog voice or
-/// the current Pocket TTS cloned sample.
+/// a Supertonic voice style.
 enum AuditionVoice: Equatable, Hashable {
     case kokoro(Int)
-    case pocket
+    case supertonic(Int)
 
     var label: String {
         switch self {
         case .kokoro(let id): return VoiceCatalog.voice(forID: id).humanName
-        case .pocket: return "Pocket (cloned sample)"
+        case .supertonic(let id):
+            return "Supertonic \(SupertonicVoiceCatalog.voice(forID: id).name)"
         }
     }
 
@@ -17,7 +18,7 @@ enum AuditionVoice: Equatable, Hashable {
     var cacheLabel: String {
         switch self {
         case .kokoro(let id): return "k\(id)"
-        case .pocket: return "pocket"
+        case .supertonic(let id): return "st\(id)"
         }
     }
 }

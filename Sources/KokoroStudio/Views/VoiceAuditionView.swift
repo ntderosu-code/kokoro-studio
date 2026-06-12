@@ -45,8 +45,8 @@ struct VoiceAuditionView: View {
             // A starts as whatever the script currently uses; B starts on
             // a different recommended voice so play-play comparison works
             // immediately.
-            voiceA = state.engineKind == .pocket
-                ? .pocket : .kokoro(state.voiceID)
+            voiceA = state.engineKind == .supertonic
+                ? .supertonic(state.supertonicVoiceID) : .kokoro(state.voiceID)
             if voiceA == voiceB {
                 voiceB = .kokoro(state.voiceID == 2 ? 3 : 2)
             }
@@ -67,8 +67,11 @@ struct VoiceAuditionView: View {
                         }
                     }
                 }
-                if state.engineKind == .pocket || !state.pocketVoicePath.isEmpty {
-                    Text("Pocket (cloned sample)").tag(AuditionVoice.pocket)
+                Section("Supertonic") {
+                    ForEach(SupertonicVoiceCatalog.voices) { voice in
+                        Text(voice.displayName)
+                            .tag(AuditionVoice.supertonic(voice.id))
+                    }
                 }
             }
             .labelsHidden()

@@ -47,7 +47,7 @@ for dylib in vendor/sherpa-onnx/lib/*.dylib; do
   fi
 done
 cp -R vendor/model "$APP/Contents/Resources/model"
-cp -R vendor/pocket "$APP/Contents/Resources/pocket"
+cp -R vendor/supertonic "$APP/Contents/Resources/supertonic"
 cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 SPARKLE_FRAMEWORK_SOURCE="$(find .build/artifacts -path "*/Sparkle.framework" -type d -print -quit)"
 if [ -z "$SPARKLE_FRAMEWORK_SOURCE" ]; then

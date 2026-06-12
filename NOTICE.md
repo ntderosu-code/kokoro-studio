@@ -8,7 +8,7 @@ terms:
 | Component | License |
 |---|---|
 | Kokoro-82M model weights (hexgrad) | Apache-2.0 |
-| Pocket TTS model weights (Kyutai) | CC-BY-4.0 |
+| Supertonic model weights (Supertone) | MIT |
 | sherpa-onnx runtime (k2-fsa) | Apache-2.0 |
 | ONNX Runtime (Microsoft) | MIT |
 | eSpeak NG phonemization (code + data) | **GPL-3.0** |
