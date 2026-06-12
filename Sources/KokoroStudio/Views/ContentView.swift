@@ -453,10 +453,11 @@ struct ContentView: View {
         .frame(height: 22)
     }
 
+    /// Compact pill that hugs its content — just Generate when idle,
+    /// growing to fit the progress bar and Stop while generating.
     private var actionBar: some View {
         HStack(spacing: 12) {
             statusView
-            Spacer()
             if state.isGenerating {
                 Button("Stop") {
                     state.cancelGeneration()
@@ -480,8 +481,9 @@ struct ContentView: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        .animation(.easeInOut(duration: 0.25), value: state.isGenerating)
     }
 
     @ViewBuilder
