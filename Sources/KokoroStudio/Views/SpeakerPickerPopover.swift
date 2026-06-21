@@ -113,9 +113,12 @@ struct SpeakerPickerPopover: View {
                                     Circle().strokeBorder(.primary, lineWidth: 2)
                                 }
                             }
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Color \(index + 1)")
+                    .accessibilityValue(selected ? "Selected" : "")
                 }
             }
 

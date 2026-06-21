@@ -94,6 +94,7 @@ struct ScriptTabBar: View {
             .buttonStyle(.plain)
             .opacity(isActive || isHovered ? 1 : 0.4)
             .help("Close tab (⇧⌘W)")
+            .accessibilityLabel("Close \(doc.title)")
             // A real button so tabs are focusable and operable from the
             // keyboard, not just clickable.
             Button {
@@ -109,6 +110,8 @@ struct ScriptTabBar: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Script tab: \(doc.title)")
+            .accessibilityAddTraits(isActive ? [.isSelected] : [])
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
@@ -142,9 +145,6 @@ struct ScriptTabBar: View {
             Divider()
             Button("Delete…", role: .destructive) { deleteTarget = doc }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Script tab: \(doc.title)")
-        .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 
 }

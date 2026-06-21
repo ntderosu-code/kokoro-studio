@@ -6,3 +6,7 @@ vendor/
 
 # Superpowers brainstorm scratch
 .superpowers/
+
+# Claude local state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Liquid Glass Design Review"
+  short_description: "Design and audit Apple Liquid Glass UI"
+  default_prompt: "Use $liquid-glass-design-review to review this Apple-platform interface for Liquid Glass fit, implementation, and accessibility."
